@@ -47,6 +47,7 @@ async def test_portfolio_filters_and_csv_columns(client, db):
     for filters in [{'search': 'PAYMENTS'}, {'status': portfolio['status']}, {'productArea': portfolio['productArea']}]:
         report = await client.get('/api/reports/portfolios', headers=headers, params=filters)
         inventory = await client.get('/api/portfolios', headers=headers, params=filters)
+        assert inventory.status_code == 200
         assert report.status_code == 200 and report.json() == inventory.json()
     response = await client.get('/api/reports/portfolios', headers=headers, params={'format': 'csv', 'pageSize': 1})
     assert response.status_code == 200 and len(rows(response)) == 3
@@ -65,6 +66,7 @@ async def test_scope_and_read_only_export_prohibition(client, db):
         response = await client.get('/api/reports/' + kind, headers=leader, params={'format': 'csv'})
         assert response.status_code == 200 and 'Customer Platform' not in response.text
     restricted = await client.get('/api/reports/applications', headers=leader, params={'format': 'csv', 'portfolioId': str(hidden['_id'])})
+    assert restricted.status_code == 200
     assert rows(restricted) == []
     readonly = await auth(client, 'readonly@ketsip.local')
     await db.roles.update_one({'name': 'Read Only'}, {'$addToSet': {'permissions': 'export'}})
@@ -72,7 +74,9 @@ async def test_scope_and_read_only_export_prohibition(client, db):
         assert (await client.get('/api/reports/' + kind, headers=readonly)).status_code == 200
         assert (await client.get('/api/reports/' + kind, headers=readonly, params={'format': 'csv'})).status_code == 403
     await db.users.update_one({'email': 'leader@ketsip.local'}, {'$set': {'portfolioAccess': []}})
-    assert (await client.get('/api/reports/applications', headers=leader)).json()['total'] == 0
+    response = await client.get('/api/reports/applications', headers=leader)
+    assert response.status_code == 200
+    assert response.json()['total'] == 0
 
 
 async def test_export_exceeds_page_limit_and_preserves_all_fields(client, db):
@@ -88,10 +92,12 @@ async def test_export_exceeds_page_limit_and_preserves_all_fields(client, db):
     data = rows(response)
     assert len(data) == 105 and len({row['name'] for row in data}) == 105
     page = await client.get('/api/reports/applications', headers=headers, params={'search': 'Bulk report', 'pageSize': 100})
+    assert page.status_code == 200
     by_name = {item['name']: item for item in page.json()['items']}
     for row in data[:100]:
         assert row == {field: str(by_name[row['name']][field]) for field in APPLICATION_COLUMNS}
     filtered = await client.get('/api/reports/applications', headers=headers, params={'format': 'csv', 'search': 'Bulk report 104', 'riskLevel': original['riskLevel']})
+    assert filtered.status_code == 200
     assert [row['name'] for row in rows(filtered)] == ['Bulk report 104']
 
 
@@ -107,9 +113,59 @@ async def test_formula_injection_and_filter_validation(client, db):
         assert (await client.get('/api/reports/' + kind, headers=headers, params={'format': 'pdf'})).status_code == 400
         assert (await client.get('/api/reports/' + kind, headers=headers, params={'pageSize': 101})).status_code == 422
         assert (await client.get('/api/reports/' + kind, headers=headers, params={'search': 'x' * 201})).status_code == 422
-        assert (await client.get('/api/reports/' + kind, headers=headers, params={'search': '.*'})).json()['total'] == 0
+        response = await client.get('/api/reports/' + kind, headers=headers, params={'search': '.*'})
+        assert response.status_code == 200
+        assert response.json()['total'] == 0
     for params in [{'portfolioId': 'bad'}, {'criticality': 'bad'}, {'riskLevel': 'bad'}, {'lifecycleStatus': 'bad'}]:
         assert (await client.get('/api/reports/applications', headers=headers, params=params)).status_code == 422
     assert (await client.get('/api/reports/portfolios', headers=headers, params={'status': 'bad'})).status_code == 422
     await db.roles.update_one({'name': 'Executive'}, {'$set': {'permissions': ['export']}})
     assert (await client.get('/api/reports/applications', headers=headers, params={'format': 'csv'})).status_code == 403
+
+
+async def test_application_csv_neutralizes_persisted_portfolio_names(client, db):
+    """Export exact stored names safely, including across pagination boundaries."""
+    headers = await auth(client, 'executive@ketsip.local')
+    application = await db.applications.find_one({'name': 'Payment Gateway'})
+    portfolio = await db.portfolios.find_one({'_id': application['portfolioId']})
+    prefixes = ['', ' ', '\u00a0', '\u2003', ' \u2003\u00a0']
+    dangerous = [prefix + marker + 'SUM(1,2)' for prefix in prefixes for marker in '=+-@']
+    dangerous += [prefix + chr(code) + 'ordinary' for prefix in prefixes for code in (*range(32), 127)]
+    dangerous += ['\u2003\t =SUM(1,2)', '\u00a0\x7f+1']
+    ordinary = ['\u2003ordinary', 'ordinary=1', 'ordinary\ttext', 'quoted,"value"', 'line\nbreak']
+    expected = {}
+    for index, value in enumerate(dangerous + ordinary):
+        portfolio_id = ObjectId()
+        name = f'CSV safety case {index:03}'
+        await db.portfolios.insert_one({**portfolio, '_id': portfolio_id, 'name': value, 'seedKey': f'csv-portfolio-{index}'})
+        await db.applications.insert_one({**application, '_id': ObjectId(), 'name': name,
+                                          'description': 'CSV safety test case', 'portfolioId': portfolio_id,
+                                          'seedKey': f'csv-application-{index}'})
+        assert (await db.portfolios.find_one({'_id': portfolio_id}))['name'] == value
+        expected[name] = "'" + value if index < len(dangerous) else value
+
+    response = await client.get('/api/reports/applications', headers=headers,
+                                params={'format': 'csv', 'search': 'CSV safety test case', 'pageSize': 1})
+    assert response.status_code == 200
+    exported = rows(response)
+    assert len(exported) == len(expected)
+    assert {row['name']: row['portfolioName'] for row in exported} == expected
+
+
+async def test_portfolio_csv_neutralizes_persisted_names(client, db):
+    """Verify the portfolio report also emits exact neutralized persisted names."""
+    headers = await auth(client, 'executive@ketsip.local')
+    portfolio = await db.portfolios.find_one({'name': 'Payments'})
+    cases = [('=1,2', "'=1,2"), ('+1', "'+1"), ('-1', "'-1"), ('@SUM(1)', "'@SUM(1)"),
+             ('\x01text', "'\x01text"), ('\x7ftext', "'\x7ftext"), ('ordinary,"name"', 'ordinary,"name"')]
+    for index, (value, expected) in enumerate(cases):
+        portfolio_id = ObjectId()
+        await db.portfolios.insert_one({**portfolio, '_id': portfolio_id, 'name': value,
+                                        'description': 'CSV portfolio safety case', 'seedKey': f'csv-portfolio-only-{index}'})
+        assert (await db.portfolios.find_one({'_id': portfolio_id}))['name'] == value
+    response = await client.get('/api/reports/portfolios', headers=headers,
+                                params={'format': 'csv', 'search': 'CSV portfolio safety case'})
+    assert response.status_code == 200
+    exported = rows(response)
+    assert len(exported) == len(cases)
+    assert {row['name'] for row in exported} == {expected for _, expected in cases}

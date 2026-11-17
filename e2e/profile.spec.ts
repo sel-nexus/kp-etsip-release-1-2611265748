@@ -1,13 +1,7 @@
 /** Specify live profile journeys; the parent runs them after independent review. */
-import { test, expect, type Page } from '../frontend/node_modules/@playwright/test';
-import { loadEnv } from '../frontend/node_modules/vite';
-import path from 'node:path';
-import { captureErrors, credentials, login } from './helpers';
-
-const backendEnv = { ...loadEnv('development', path.resolve(import.meta.dirname, '../backend'), ''), ...process.env };
-const profileEmail = process.env.E2E_PROFILE_EMAIL || 'engineer@ketsip.local';
-const profilePassword = process.env.E2E_PROFILE_PASSWORD || backendEnv.SEED_DEMO_PASSWORD || credentials.password;
-const adminPassword = process.env.E2E_ADMIN_PASSWORD || backendEnv.SEED_ADMIN_PASSWORD;
+import { test, expect, type Page } from '../frontend/node_modules/@playwright/test/index.mjs';
+import { captureErrors, withDisposableUser } from './helpers';
+import { e2eApiUrl } from '../frontend/scripts/e2e-setup';
 
 /** Sign in with chosen credentials through the real visible form. */
 async function signIn(page: Page, email: string, password: string, status = 200) {
@@ -33,70 +27,98 @@ async function rotate(page: Page, current: string, next: string) {
 }
 
 test('account → profile → save preference → reload → persisted preference', async ({ page }, testInfo) => {
-  const errors = captureErrors(page);
-  await page.goto('/');
-  await page.getByRole('link', { name: 'Sign in', exact: true }).click();
-  const result = await login(page);
-  await page.getByRole('link', { name: 'My Profile', exact: true }).click();
-  await expect(page.getByText(result.user.email, { exact: true })).toBeVisible();
-  await page.getByRole('radio', { name: 'Applications', exact: true }).check();
-  const save = page.waitForResponse((response) => response.url().endsWith('/api/auth/profile'));
-  await page.getByRole('button', { name: 'Save preference' }).click();
-  const saved = await save;
-  expect(saved.status()).toBe(200);
-  expect((await saved.json()).defaultLandingPage).toBe('applications');
-  await expect(page.getByText('Landing preference saved.')).toBeVisible();
-  const me = page.waitForResponse((response) => response.url().endsWith('/api/auth/me'));
-  await page.reload();
-  const restored = await me;
-  expect(restored.status()).toBe(200);
-  expect((await restored.json()).defaultLandingPage).toBe('applications');
-  await expect(page.getByRole('radio', { name: 'Applications', exact: true })).toBeChecked();
-  await page.screenshot({ path: testInfo.outputPath('profile.png'), fullPage: true });
-  await page.getByRole('link', { name: 'Account & session', exact: true }).click();
-  await page.getByRole('link', { name: 'Manage profile and password' }).click();
-  await expect(page.getByRole('radio', { name: 'Applications', exact: true })).toBeChecked();
-  expect(errors).toEqual([]);
+  await withDisposableUser(page, testInfo, 'Executive', false, async ({ email, password }) => {
+    const errors = captureErrors(page);
+    await page.goto('/');
+    await page.getByRole('link', { name: 'Sign in', exact: true }).click();
+    const result = await signIn(page, email, password);
+    await page.getByRole('link', { name: 'My Profile', exact: true }).click();
+    await expect(page.getByText(result.user.email, { exact: true })).toBeVisible();
+    await page.getByRole('radio', { name: 'Applications', exact: true }).check();
+    const save = page.waitForResponse((response) => response.url().endsWith('/api/auth/profile'));
+    await page.getByRole('button', { name: 'Save preference' }).click();
+    const saved = await save;
+    expect(saved.status()).toBe(200);
+    expect((await saved.json()).defaultLandingPage).toBe('applications');
+    await expect(page.getByText('Landing preference saved.')).toBeVisible();
+    const me = page.waitForResponse((response) => response.url().endsWith('/api/auth/me'));
+    await page.reload();
+    const restored = await me;
+    expect(restored.status()).toBe(200);
+    expect((await restored.json()).defaultLandingPage).toBe('applications');
+    await expect(page.getByRole('radio', { name: 'Applications', exact: true })).toBeChecked();
+    await page.screenshot({ path: testInfo.outputPath('profile.png'), fullPage: true });
+    await page.getByRole('link', { name: 'Account & session', exact: true }).click();
+    await page.getByRole('link', { name: 'Manage profile and password' }).click();
+    await expect(page.getByRole('radio', { name: 'Applications', exact: true })).toBeChecked();
+    // Preserve the original reset assertion on the disposable account.
+    await page.getByRole('radio', { name: 'Executive dashboard', exact: true }).check();
+    const reset = page.waitForResponse(response => response.url().endsWith('/api/auth/profile') && response.request().method() === 'PUT');
+    await page.getByRole('button', { name: 'Save preference' }).click();
+    expect((await reset).status()).toBe(200);
+    expect(errors).toEqual([]);
+  });
 });
 
-test('change password → old login denied → new login succeeds → restore account password', async ({ page }) => {
-  const errors = captureErrors(page, true);
-  await page.goto('/login');
-  const result = await signIn(page, profileEmail, profilePassword);
-  await page.getByRole('link', { name: 'My Profile', exact: true }).click();
-  await expect(page.getByText(result.user.email, { exact: true })).toBeVisible();
-  await page.getByLabel('Current password', { exact: true }).fill(profilePassword);
-  await page.getByLabel('New password', { exact: true }).fill('short');
-  await page.getByLabel('Confirm new password', { exact: true }).fill('short');
-  await page.getByRole('button', { name: 'Change password', exact: true }).click();
-  await expect(page.getByText('New password must contain 12–72 UTF-8 bytes.')).toBeVisible();
-  const replacement = `ProfileJourney-${Date.now()}!`;
-  await rotate(page, profilePassword, replacement);
-  expect(await page.evaluate(() => localStorage.getItem('etsip.token'))).toBeNull();
-  await signIn(page, profileEmail, profilePassword, 401);
-  await expect(page.getByRole('alert')).toHaveText('Invalid email or password');
-  const fresh = await signIn(page, profileEmail, replacement);
-  expect(fresh.user.mustChangePassword).toBe(false);
-  await expect(page.getByRole('heading', { name: 'Account & session' })).toBeVisible();
-  await page.getByRole('link', { name: 'My Profile', exact: true }).click();
-  await rotate(page, replacement, profilePassword);
-  await signIn(page, profileEmail, profilePassword);
-  await expect(page.getByText(result.user.email, { exact: true })).toBeVisible();
-  expect(errors).toEqual([]);
+test('change password → old login denied → new login succeeds → restore account password', async ({ page }, testInfo) => {
+  await withDisposableUser(page, testInfo, 'Engineer', false, async ({ email: profileEmail, password: profilePassword }) => {
+    const errors = captureErrors(page, true);
+    await page.goto('/login');
+    const result = await signIn(page, profileEmail, profilePassword);
+    await page.getByRole('link', { name: 'My Profile', exact: true }).click();
+    await expect(page.getByText(result.user.email, { exact: true })).toBeVisible();
+    await page.getByLabel('Current password', { exact: true }).fill(profilePassword);
+    await page.getByLabel('New password', { exact: true }).fill('short');
+    await page.getByLabel('Confirm new password', { exact: true }).fill('short');
+    await page.getByRole('button', { name: 'Change password', exact: true }).click();
+    await expect(page.getByText('New password must contain 12–72 UTF-8 bytes.')).toBeVisible();
+    const replacement = `ProfileJourney-${Date.now()}!`;
+    await rotate(page, profilePassword, replacement);
+    expect(await page.evaluate(() => localStorage.getItem('etsip.token'))).toBeNull();
+    await signIn(page, profileEmail, profilePassword, 401);
+    await expect(page.getByRole('alert')).toHaveText('Invalid email or password');
+    const fresh = await signIn(page, profileEmail, replacement);
+    expect(fresh.user.mustChangePassword).toBe(false);
+    expect(fresh.user.role).toBe('Engineer');
+    const landing = fresh.user.defaultLandingPage || 'applications';
+    await expect(page).toHaveURL(new RegExp(`/${landing}$`));
+    await expect(page.getByRole('heading', { name: landing === 'dashboard' ? 'Executive dashboard' : 'Applications', exact: true })).toBeVisible();
+    await page.getByRole('link', { name: 'Account & session', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Account & session' })).toBeVisible();
+    await page.getByRole('link', { name: 'My Profile', exact: true }).click();
+    await rotate(page, replacement, profilePassword);
+    await signIn(page, profileEmail, profilePassword);
+    await page.getByRole('link', { name: 'Account & session', exact: true }).click();
+    await expect(page.getByText(result.user.email, { exact: true })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
 });
 
-test('seed administrator is forced to profile before account access', async ({ page }) => {
-  const errors = captureErrors(page);
-  expect(adminPassword, 'Configure E2E_ADMIN_PASSWORD or SEED_ADMIN_PASSWORD for the untouched seed administrator').toBeTruthy();
-  await page.goto('/account');
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
-  const result = await signIn(page, 'admin@ketsip.local', adminPassword!);
-  expect(result.user.mustChangePassword).toBe(true);
-  await expect(page.getByRole('heading', { name: 'My Profile' })).toBeVisible();
-  await expect(page.getByText(/Password change is required before business access/)).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Account & session' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Change password', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Sign out' }).click();
-  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
-  expect(errors).toEqual([]);
+test('disposable administrator is forced to profile before account access', async ({ page }, testInfo) => {
+  await withDisposableUser(page, testInfo, 'Administrator', true, async ({ email, password }) => {
+    const errors = captureErrors(page);
+    await page.goto('/account');
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+    const result = await signIn(page, email, password);
+    expect(result.user.mustChangePassword).toBe(true);
+    await expect(page.getByRole('heading', { name: 'My Profile' })).toBeVisible();
+    await expect(page.getByText(/Password change is required before business access/)).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Account & session' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Change password', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+    const again = await signIn(page, email, password);
+    expect(again.user.mustChangePassword).toBe(true);
+    await expect(page.getByRole('heading', { name: 'My Profile' })).toBeVisible();
+    const replacement = `ForcedJourney-${Date.now()}!`;
+    await rotate(page, password, replacement);
+    const changed = await signIn(page, email, replacement);
+    expect(changed.user.mustChangePassword).toBe(false);
+    await expect(page.getByRole('heading', { name: 'Executive dashboard', exact: true })).toBeVisible();
+    const revoked = await page.request.get(`${e2eApiUrl}/api/auth/me`, { headers: { Authorization: `Bearer ${again.token}` } });
+    expect(revoked.status()).toBe(401);
+    const business = await page.request.get(`${e2eApiUrl}/api/users`, { headers: { Authorization: `Bearer ${changed.token}` } });
+    expect(business.status()).toBe(200);
+    expect(errors).toEqual([]);
+  });
 });

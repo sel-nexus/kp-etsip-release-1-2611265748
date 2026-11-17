@@ -26,10 +26,14 @@ async def test_crud_filters_uniqueness_and_persisted_requery(client, db):
     assert (await client.post('/api/portfolios', headers=auth, json=PAYLOAD)).status_code == 409
     found = await client.get('/api/portfolios', headers=auth, params={'search': 'inventory', 'status': 'Active', 'productArea': 'Area', 'page': 1, 'pageSize': 1})
     assert found.status_code == 200 and found.json()['total'] == 1 and found.json()['items'][0]['id'] == identifier
-    assert (await client.get('/api/portfolios', headers=auth, params={'search': '.*'})).json()['total'] == 0
+    literal_search = await client.get('/api/portfolios', headers=auth, params={'search': '.*'})
+    assert literal_search.status_code == 200
+    assert literal_search.json()['total'] == 0
     changed = {**PAYLOAD, 'name': 'Renamed', 'status': 'Archived', 'owner': 'Another'}
     assert (await client.put(f'/api/portfolios/{identifier}', headers=auth, json=changed)).status_code == 200
-    assert (await client.get(f'/api/portfolios/{identifier}', headers=auth)).json()['owner'] == 'Another'
+    detail = await client.get(f'/api/portfolios/{identifier}', headers=auth)
+    assert detail.status_code == 200
+    assert detail.json()['owner'] == 'Another'
     assert (await db.portfolios.find_one({'_id': ObjectId(identifier)}))['status'] == 'Archived'
     assert (await client.delete(f'/api/portfolios/{identifier}', headers=auth)).status_code == 204
     assert (await client.get(f'/api/portfolios/{identifier}', headers=auth)).status_code == 404
@@ -46,8 +50,9 @@ async def test_linked_apps_are_real_paginated_and_prevent_deletion(client, db):
     for name, score in [('Alpha', 50), ('Beta', 51)]:
         await db.applications.insert_one({'name': name, 'portfolioId': portfolio['_id'], 'qualityScore': score,
             'productArea': 'Payments', 'lifecycleStatus': 'Active', 'riskLevel': 'Medium'})
-    detail = (await client.get(f'/api/portfolios/{identifier}', headers=auth)).json()
-    assert detail['applicationCount'] == 2 and detail['qualityScore'] == 51
+    detail = await client.get(f'/api/portfolios/{identifier}', headers=auth)
+    assert detail.status_code == 200
+    assert detail.json()['applicationCount'] == 2 and detail.json()['qualityScore'] == 51
     linked = await client.get(f'/api/portfolios/{identifier}/applications', headers=auth, params={'pageSize': 1, 'page': 2})
     assert linked.status_code == 200 and linked.json()['total'] == 2 and linked.json()['items'][0]['name'] == 'Beta'
     assert (await client.delete(f'/api/portfolios/{identifier}', headers=auth)).status_code == 409
@@ -62,7 +67,9 @@ async def test_visibility_permissions_and_live_role_changes(client, db):
     payments = await db.portfolios.find_one({'name': 'Payments'})
     hidden = await db.portfolios.find_one({'name': 'Customer Platform'})
     pid, other = str(payments['_id']), str(hidden['_id'])
-    assert (await client.get('/api/portfolios', headers=leader)).json()['total'] == 1
+    listed = await client.get('/api/portfolios', headers=leader)
+    assert listed.status_code == 200
+    assert listed.json()['total'] == 1
     for method, path in [('get', f'/api/portfolios/{other}'), ('get', f'/api/portfolios/{other}/applications'), ('delete', f'/api/portfolios/{other}')]:
         assert (await getattr(client, method)(path, headers=leader)).status_code == 404
     assert (await client.put(f'/api/portfolios/{pid}', headers=leader, json=PAYLOAD)).status_code == 200
@@ -71,7 +78,9 @@ async def test_visibility_permissions_and_live_role_changes(client, db):
     for auth in [reader, engineer]:
         assert (await client.put(f'/api/portfolios/{pid}', headers=auth, json=PAYLOAD)).status_code == 403
     await db.users.update_one({'email': 'leader@ketsip.local'}, {'$set': {'portfolioAccess': []}})
-    assert (await client.get('/api/portfolios', headers=leader)).json()['total'] == 0
+    listed = await client.get('/api/portfolios', headers=leader)
+    assert listed.status_code == 200
+    assert listed.json()['total'] == 0
     assert (await client.get(f'/api/portfolios/{pid}', headers=leader)).status_code == 404
     await db.roles.update_one({'name': 'Read Only'}, {'$set': {'permissions': ['view', 'create', 'edit', 'delete']}})
     assert (await client.post('/api/portfolios', headers=reader, json=PAYLOAD)).status_code == 403
@@ -99,7 +108,15 @@ async def test_auth_validation_and_duplicate_update(client, db):
     for query in ['page=0', 'pageSize=101', 'pageSize=0', 'status=Invalid', 'search=' + 'x' * 201]:
         assert (await client.get('/api/portfolios?' + query, headers=auth)).status_code == 422
     assert (await client.get('/api/portfolios/not-an-id', headers=auth)).status_code == 422
-    assert (await client.get('/api/portfolios/' + str(ObjectId()), headers=auth)).status_code == 404
+    missing = ObjectId()
+    before_portfolios = await db.portfolios.find({}).to_list(None)
+    before_audits = await db.audit_logs.count_documents({})
+    assert (await client.get('/api/portfolios/' + str(missing), headers=auth)).status_code == 404
+    assert (await client.put('/api/portfolios/' + str(missing), headers=auth, json=PAYLOAD)).status_code == 404
+    assert (await client.delete('/api/portfolios/' + str(missing), headers=auth)).status_code == 404
+    assert await db.portfolios.find_one({'_id': missing}) is None
+    assert await db.portfolios.find({}).to_list(None) == before_portfolios
+    assert await db.audit_logs.count_documents({}) == before_audits
     one = await db.portfolios.find_one({'name': 'Payments'})
     assert (await client.put('/api/portfolios/' + str(one['_id']), headers=auth, json={**PAYLOAD, 'name': 'Customer Platform'})).status_code == 409
     assert (await db.portfolios.find_one({'_id': one['_id']}))['name'] == 'Payments'

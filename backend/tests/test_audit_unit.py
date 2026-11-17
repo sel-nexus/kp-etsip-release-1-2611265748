@@ -18,6 +18,34 @@ def test_csv_safe_neutralizes_formula_and_control_prefixes(value, expected):
     assert csv_safe(value) == expected
 
 
+@pytest.mark.parametrize('control', [chr(code) for code in (*range(32), 127)])
+@pytest.mark.parametrize('prefix', ['', ' ', '  ', '\u00a0'])
+@pytest.mark.parametrize('suffix', ['', 'text', '=1+1', '+SUM(A1)', '-2', '@formula'])
+def test_csv_safe_neutralizes_every_leading_ascii_control(control, prefix, suffix):
+    """Guard each leading control byte, even after whitespace or before formulas."""
+    value = prefix + control + suffix
+    assert csv_safe(value) == "'" + value
+
+
+@pytest.mark.parametrize('prefix', ['', ' ', '  ', '\u00a0', '\u2003', '\t', '\n', '\r', ' \t\n'])
+@pytest.mark.parametrize('formula', ['=1+1', '+SUM(A1)', '-2', '@formula'])
+def test_csv_safe_neutralizes_formulas_after_whitespace(prefix, formula):
+    """Protect each spreadsheet formula prefix after varied whitespace."""
+    value = prefix + formula
+    assert csv_safe(value) == "'" + value
+
+
+@pytest.mark.parametrize('value,expected', [
+    ('', ''), ('   ', '   '), ('\u00a0 ordinary', '\u00a0 ordinary'),
+    ('ordinary\ttext', 'ordinary\ttext'), ('ordinary\n=1+1', 'ordinary\n=1+1'),
+    ('quoted, "text"', 'quoted, "text"'), (42, '42'),
+    (datetime(2025, 1, 2, tzinfo=UTC), '2025-01-02T00:00:00+00:00'),
+])
+def test_csv_safe_preserves_nonleading_content_and_formats_values(value, expected):
+    """Retain safe content and the existing non-string conversion contract."""
+    assert csv_safe(value) == expected
+
+
 async def test_audit_listing_scope_and_validation(application, db):
     """Filter real persisted records, and deny invalid or unauthorized access."""
     auth = application.state.auth

@@ -92,9 +92,20 @@ export default function DashboardPage() {
                       <h3>{item.name}</h3>
                       <p>Applications: {item.applicationCount}</p>
                       <p>Quality score: {item.qualityScore === null ? 'N/A' : item.qualityScore}</p>
-                      {item.qualityScore !== null && <div aria-hidden="true" className="h-2 bg-surface-container"><div className="h-2 bg-primary" style={{ width: `${item.qualityScore}%` }} /></div>}
+                      {item.qualityScore !== null && (
+                        <div aria-hidden="true" className="h-2 bg-surface-container">
+                          <div className="h-2 bg-primary" style={{ width: `${item.qualityScore}%` }} />
+                        </div>
+                      )}
                       <p className="mt-4">High-risk applications: {item.highRiskCount}</p>
-                      {item.applicationCount > 0 && <div aria-hidden="true" className="h-2 bg-surface-container"><div className="h-2 bg-secondary" style={{ width: `${100 * item.highRiskCount / item.applicationCount}%` }} /></div>}
+                      {item.applicationCount > 0 && (
+                        <div aria-hidden="true" className="h-2 bg-surface-container">
+                          <div
+                            className="h-2 bg-secondary"
+                            style={{ width: `${100 * item.highRiskCount / item.applicationCount}%` }}
+                          />
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>

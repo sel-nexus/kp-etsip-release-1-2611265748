@@ -1,17 +1,13 @@
 /** Exercise application discovery through the running UI and real API. */
-import { test, expect } from '../frontend/node_modules/@playwright/test';
-import { loadEnv } from '../frontend/node_modules/vite';
-import path from 'node:path';
-
-const env = { ...loadEnv('development', path.resolve(import.meta.dirname, '../backend'), ''), ...process.env };
+import { test, expect } from '../frontend/node_modules/@playwright/test/index.mjs';
 
 test('scoped user filters applications and follows portfolio drilldown', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   page.on('requestfailed', request => errors.push(`${request.url()}: ${request.failure()?.errorText}`));
-  const password = env.E2E_DEMO_PASSWORD || env.SEED_DEMO_PASSWORD;
-  expect(password, 'Set E2E_DEMO_PASSWORD or SEED_DEMO_PASSWORD').toBeTruthy();
+  const password = process.env.E2E_DEMO_PASSWORD;
+  expect(password, 'Set E2E_DEMO_PASSWORD').toBeTruthy();
   await page.goto('/login');
   await page.getByLabel('Email').fill('readonly@ketsip.local');
   await page.getByLabel('Password', { exact: true }).fill(password!);

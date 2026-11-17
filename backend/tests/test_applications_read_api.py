@@ -31,12 +31,17 @@ async def test_list_detail_filters_pagination_and_portfolio_linkage(client, db):
     linked = await client.get('/api/portfolios/' + str(portfolio['_id']) + '/applications', headers=auth)
     assert linked.status_code == 200 and item['id'] in [row['id'] for row in linked.json()['items']]
     result = await client.get('/api/portfolios/' + str(portfolio['_id']), headers=auth)
+    assert result.status_code == 200
     assert result.json()['applicationCount'] == linked.json()['total'] == 4
     second = await client.get('/api/applications', headers=auth, params={'page': 2, 'pageSize': 1})
+    assert second.status_code == 200
     first = await client.get('/api/applications', headers=auth, params={'page': 1, 'pageSize': 1})
+    assert first.status_code == 200
     assert second.json()['total'] == 10 and second.json()['items'][0]['id'] != first.json()['items'][0]['id']
     await db.portfolios.update_one({'_id': portfolio['_id']}, {'$set': {'name': 'Renamed'}})
-    assert (await client.get('/api/applications/' + item['id'], headers=auth)).json()['portfolioName'] == 'Renamed'
+    reread = await client.get('/api/applications/' + item['id'], headers=auth)
+    assert reread.status_code == 200
+    assert reread.json()['portfolioName'] == 'Renamed'
 
 
 @pytest.mark.parametrize('email,expected', [('executive@ketsip.local', 10), ('auditor@ketsip.local', 10),
@@ -51,7 +56,9 @@ async def test_role_scopes_and_invisible_detail(client, db, email, expected):
     assert response.status_code == (200 if expected == 10 else 404)
     if expected == 4:
         await db.users.update_one({'email': email}, {'$set': {'portfolioAccess': []}})
-        assert (await client.get('/api/applications', headers=auth)).json()['total'] == 0
+        result = await client.get('/api/applications', headers=auth)
+        assert result.status_code == 200
+        assert result.json()['total'] == 0
         assert (await client.get('/api/applications/' + str(hidden['_id']), headers=auth)).status_code == 404
 
 
@@ -61,13 +68,17 @@ async def test_auth_permission_forced_password_and_invalid_queries(client, db):
     admin = await headers(client, 'admin@ketsip.local')
     assert (await client.get('/api/applications', headers=admin)).status_code == 403
     await db.users.update_one({'email': 'admin@ketsip.local'}, {'$set': {'mustChangePassword': False}})
-    assert (await client.get('/api/applications', headers=admin)).json()['total'] == 10
+    result = await client.get('/api/applications', headers=admin)
+    assert result.status_code == 200
+    assert result.json()['total'] == 10
     for query in ['page=0', 'pageSize=101', 'pageSize=0', 'criticality=bogus', 'riskLevel=Critical',
                   'lifecycleStatus=bad', 'portfolioId=bad', 'search=' + 'x' * 201]:
         assert (await client.get('/api/applications?' + query, headers=admin)).status_code == 422
     assert (await client.get('/api/applications/bad', headers=admin)).status_code == 422
     assert (await client.get('/api/applications/' + str(ObjectId()), headers=admin)).status_code == 404
-    assert (await client.get('/api/applications', headers=admin, params={'search': '.*'})).json()['total'] == 0
+    result = await client.get('/api/applications', headers=admin, params={'search': '.*'})
+    assert result.status_code == 200
+    assert result.json()['total'] == 0
     await db.roles.update_one({'name': 'Administrator'}, {'$set': {'permissions': []}})
     assert (await client.get('/api/applications', headers=admin)).status_code == 403
 
@@ -83,8 +94,12 @@ async def test_each_filter_and_restricted_privileged_role(client, db):
         result = await client.get('/api/applications', headers=auth, params=params)
         assert result.status_code == 200 and result.json()['total'] == expected
     await db.users.update_one({'email': 'executive@ketsip.local'}, {'$set': {'portfolioAccess': [payments['_id']]}})
-    assert (await client.get('/api/applications', headers=auth)).json()['total'] == 4
-    assert (await client.get('/api/applications', headers=auth, params={'portfolioId': str(other['_id'])})).json()['total'] == 0
+    result = await client.get('/api/applications', headers=auth)
+    assert result.status_code == 200
+    assert result.json()['total'] == 4
+    result = await client.get('/api/applications', headers=auth, params={'portfolioId': str(other['_id'])})
+    assert result.status_code == 200
+    assert result.json()['total'] == 0
     hidden = await db.applications.find_one({'portfolioId': other['_id']})
     assert (await client.get('/api/applications/' + str(hidden['_id']), headers=auth)).status_code == 404
     assert (await client.get('/api/portfolios/' + str(other['_id']) + '/applications', headers=auth)).status_code == 404

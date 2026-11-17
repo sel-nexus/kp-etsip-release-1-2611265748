@@ -66,6 +66,40 @@ async def test_csv_full_filtered_results_formula_safety_and_export_event(client,
     assert page.json()['total'] == 27 and len(page.json()['items']) == 1 and 'passwordHash' not in page.text
 
 
+async def test_csv_export_preserves_and_neutralizes_leading_controls_and_formulas(client, db):
+    """Read actual CSV cells for persisted unsafe and ordinary audit values."""
+    auditor, user = await login(client, 'auditor@ketsip.local')
+    now = datetime.now(UTC)
+    unsafe = [prefix + chr(code) + suffix
+              for code in (*range(32), 127)
+              for prefix in ('', ' ', '\u00a0')
+              for suffix in ('text', '=1+1')]
+    unsafe += [prefix + formula for prefix in ('', '  ', '\t', '\n', '\r', '\u2003')
+               for formula in ('=1+1', '+SUM(A1)', '-2', '@formula')]
+    safe = ['   ', 'ordinary\ttext', 'ordinary\n=1+1', 'quoted, "text"']
+    expected = {}
+    rows = []
+    for value, neutralize in [(value, True) for value in unsafe] + [(value, False) for value in safe]:
+        entity_id = ObjectId()
+        expected[str(entity_id)] = ("'" if neutralize else '') + value
+        rows.append({'timestamp': now, 'createdAt': now, 'updatedAt': now,
+                     'userId': ObjectId(user['id']), 'userName': value, 'action': 'edit',
+                     'entityType': 'portfolio', 'entityId': entity_id, 'details': value})
+    await db.audit_logs.insert_many(rows)
+    response = await client.get('/api/audit-logs', headers=auditor,
+                                params={'format': 'csv', 'action': 'edit'})
+    assert response.status_code == 200
+    assert response.headers['content-type'].startswith('text/csv')
+    parsed = list(csv.DictReader(io.StringIO(response.text, newline='')))
+    assert len(parsed) == len(rows)
+    assert {row['entityId'] for row in parsed} == set(expected)
+    for row in parsed:
+        assert row['userName'] == expected[row['entityId']]
+        assert row['details'] == expected[row['entityId']]
+        assert row['userId'] == user['id']
+        assert row['action'] == 'edit' and row['entityType'] == 'portfolio'
+
+
 async def test_restricted_auditor_scope_never_exposes_unattributed_or_other_events(client, db):
     """Fail closed on records without trustworthy portfolio attribution."""
     auditor, user = await login(client, 'auditor@ketsip.local')

@@ -60,6 +60,17 @@ describe('Application discovery', () => {
     expect(screen.queryByRole('link', { name: 'Open pipeline' })).not.toBeInTheDocument();
   });
 
+  it('renders stored markup as inert application detail text', async () => {
+    const payload = '<img src=x onerror="window.__inventoryXss = true">';
+    const fetch = mount(`/applications/${id}`);
+    fetch.mockImplementation(async input => String(input).endsWith('/auth/me') ? json(identity) : json({ ...item, description: payload }));
+    const text = await screen.findByText(payload);
+    expect(text).toBeVisible();
+    expect(text.tagName).toBe('DD');
+    expect(text.querySelector('img')).toBeNull();
+    expect((window as Window & { __inventoryXss?: boolean }).__inventoryXss).toBeUndefined();
+  });
+
   it('shows an empty result and recovers from list errors', async () => {
     const fetch = mount('/applications');
     fetch.mockImplementation(async input => String(input).endsWith('/auth/me') ? json(identity) :

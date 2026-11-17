@@ -7,8 +7,9 @@ from typing import Any
 def safe_cell(value: Any) -> str:
     """Neutralize formulas and leading control characters in untrusted values."""
     text = "" if value is None else str(value)
-    leading = text.lstrip(' ')
-    if text and (any(ord(char) < 32 or ord(char) == 127 for char in text[:len(text) - len(leading) + 1]) or leading.startswith(("=", "+", "-", "@"))):
+    leading = text.lstrip()
+    prefix = text[:len(text) - len(leading) + 1]
+    if any(ord(char) < 32 or ord(char) == 127 for char in prefix) or leading.startswith(("=", "+", "-", "@")):
         return "'" + text
     return text
 

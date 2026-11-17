@@ -1,5 +1,5 @@
 /** Exercise real administrator and auditor audit access; execution is deferred. */
-import { test, expect } from '../frontend/node_modules/@playwright/test';
+import { test, expect } from '../frontend/node_modules/@playwright/test/index.mjs';
 
 for (const role of ['admin', 'auditor'] as const) {
   test(`${role} reads live audit events and exports without user-admin access for auditors`, async ({ page }) => {

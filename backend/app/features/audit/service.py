@@ -100,6 +100,8 @@ class AuditService:
 def csv_safe(value):
     """Neutralize spreadsheet formula and control-character prefixes."""
     text = "" if value is None else value.isoformat() if isinstance(value, datetime) else str(value)
-    if text and (text[0] in "\t\r\n" or text.lstrip().startswith(("=", "+", "-", "@"))):
+    leading = text.lstrip()
+    prefix = text[:len(text) - len(leading) + 1]
+    if any(ord(char) < 32 or ord(char) == 127 for char in prefix) or leading.startswith(("=", "+", "-", "@")):
         return "'" + text
     return text

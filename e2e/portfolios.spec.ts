@@ -1,15 +1,10 @@
 /** Exercise real portfolio journeys against the running browser and API; no routes are mocked. */
-import { test, expect, type Page } from '../frontend/node_modules/@playwright/test';
-import { loadEnv } from '../frontend/node_modules/vite';
-import path from 'node:path';
-
-const env = { ...loadEnv('development', path.resolve(import.meta.dirname, '../backend'), ''), ...process.env };
-const adminPassword = env.E2E_ADMIN_PASSWORD;
-const demoPassword = env.E2E_DEMO_PASSWORD || env.SEED_DEMO_PASSWORD;
+import { test, expect, type Page } from '../frontend/node_modules/@playwright/test/index.mjs';
+const adminPassword = process.env.E2E_ADMIN_PASSWORD;
+const demoPassword = process.env.E2E_DEMO_PASSWORD;
 
 /** Sign in with an already-rotated Administrator or a seeded scoped user. */
 async function signIn(page: Page, email: string, password: string) {
-  await page.goto('/login');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   const response = page.waitForResponse(r => r.url().endsWith('/api/auth/login') && r.request().method() === 'POST');
@@ -33,6 +28,7 @@ function watch(page: Page) {
 test('administrator creates, edits, reloads, filters and deletes an unlinked portfolio', async ({ page }) => {
   const errors = watch(page);
   expect(adminPassword, 'Set E2E_ADMIN_PASSWORD to an Administrator password already changed from the seed.').toBeTruthy();
+  await page.goto('/login');
   const login = await signIn(page, 'admin@ketsip.local', adminPassword!);
   expect(login.user.mustChangePassword).toBe(false);
   const name = `Portfolio journey ${Date.now()}-${test.info().project.name}`;
@@ -54,6 +50,10 @@ test('administrator creates, edits, reloads, filters and deletes an unlinked por
     expect(body.name).toBe(name);
     await expect(page.getByRole('heading', { name })).toBeVisible();
     await expect(page.getByText('Journey owner')).toBeVisible();
+    await expect(page.getByText('No linked applications.', { exact: true })).toBeVisible();
+    const empty = await page.request.get(`/api/portfolios/${identifier}/applications`, { headers: { Authorization: `Bearer ${login.token}` } });
+    expect(empty.status()).toBe(200);
+    expect((await empty.json()).total).toBe(0);
     await page.getByRole('button', { name: 'Edit portfolio' }).click();
     await page.getByLabel('Owner', { exact: true }).fill('Updated owner');
     const updated = page.waitForResponse(r => r.url().endsWith(`/api/portfolios/${identifier}`) && r.request().method() === 'PUT');
@@ -84,7 +84,8 @@ test('administrator creates, edits, reloads, filters and deletes an unlinked por
 test('linked deletion conflicts and read-only users cannot mutate', async ({ page }) => {
   const errors = watch(page);
   expect(adminPassword, 'Set E2E_ADMIN_PASSWORD to an Administrator password already changed from the seed.').toBeTruthy();
-  expect(demoPassword, 'Set E2E_DEMO_PASSWORD or SEED_DEMO_PASSWORD.').toBeTruthy();
+  expect(demoPassword, 'Set E2E_DEMO_PASSWORD.').toBeTruthy();
+  await page.goto('/login');
   const admin = await signIn(page, 'admin@ketsip.local', adminPassword!);
   expect(admin.user.mustChangePassword).toBe(false);
   const listing = await page.request.get('/api/portfolios?pageSize=100', { headers: { Authorization: `Bearer ${admin.token}` } });
@@ -92,7 +93,10 @@ test('linked deletion conflicts and read-only users cannot mutate', async ({ pag
   const portfolios = (await listing.json()).items as { id: string; name: string; applicationCount: number }[];
   const linked = portfolios.find(item => item.applicationCount > 0);
   expect(linked, 'Preload at least one real linked application in the E2E database; this slice does not create applications.').toBeTruthy();
-  await page.goto(`/portfolios/${linked!.id}`);
+  await page.getByRole('link', { name: 'Portfolios', exact: true }).click();
+  await page.getByLabel('Search portfolios').fill(linked!.name);
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await page.getByRole('link', { name: linked!.name, exact: true }).click();
   const linkedResponse = await page.request.get(`/api/portfolios/${linked!.id}/applications`, { headers: { Authorization: `Bearer ${admin.token}` } });
   expect(linkedResponse.status()).toBe(200);
   const applications = await linkedResponse.json();

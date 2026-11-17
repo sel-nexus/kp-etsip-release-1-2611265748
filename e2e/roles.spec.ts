@@ -1,5 +1,5 @@
 /** Exercise real role editing and restoration; execution is deferred. */
-import { test, expect } from '../frontend/node_modules/@playwright/test';
+import { test, expect } from '../frontend/node_modules/@playwright/test/index.mjs';
 
 test('administrator edits and restores a role', async ({ page }) => {
   const errors: string[] = [];
