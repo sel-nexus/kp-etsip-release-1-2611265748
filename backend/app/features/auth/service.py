@@ -3,6 +3,7 @@ from typing import Any
 from app.core.config import Settings
 from app.core.errors import DomainError
 from app.core.security import create_token, decode_token, verify_password
+from app.core.transactions import transaction
 from app.features.audit.service import AuditService
 from app.features.auth.repository import AuthRepository
 from app.features.auth.schemas import LoginRequest, LoginResponse, PublicUser, Session
@@ -42,12 +43,18 @@ class AuthService:
         if role is None:
             await self.audit.login(user_id, user_name, False)
             raise DomainError(401, "Invalid email or password")
-        updated = await self.repository.mark_login(user_id, user["tokenVersion"], user["passwordHash"])
+        async def work(tx):
+            """Commit the successful login timestamp and its event together."""
+            updated = await self.repository.mark_login(user_id, user["tokenVersion"], user["passwordHash"], session=tx)
+            if updated is not None:
+                await self.audit.login(user_id, user_name, True, session=tx)
+            return updated
+        updated = await transaction(self.repository.db, work)
         if updated is None:
             await self.audit.login(user_id, user_name, False)
             raise DomainError(401, "Invalid email or password")
         identity = await self.public_user(updated)
-        await self.audit.login(user_id, user_name, True)
+
         token = create_token(user_id, identity.role, updated["tokenVersion"], self.settings)
         return LoginResponse(token=token, user=identity)
 

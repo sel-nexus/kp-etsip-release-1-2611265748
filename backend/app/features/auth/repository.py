@@ -12,6 +12,7 @@ class AuthRepository:
         """Bind shared user and role collections."""
         self.users = db.users
         self.roles = db.roles
+        self.db = db
 
     async def by_email(self, email: str) -> dict[str, Any] | None:
         """Find a normalized literal email without accepting query operators."""
@@ -25,12 +26,12 @@ class AuthRepository:
         """Read current persisted permissions rather than trusting token claims."""
         return await self.roles.find_one({"name": name})
 
-    async def mark_login(self, user_id: str, version: int, password_hash: str) -> dict[str, Any] | None:
+    async def mark_login(self, user_id: str, version: int, password_hash: str, session=None) -> dict[str, Any] | None:
         """Update lastLogin only if identity has not changed during hashing."""
         now = datetime.now(UTC)
         return await self.users.find_one_and_update(
             {"_id": ObjectId(user_id), "status": "Active", "tokenVersion": version, "passwordHash": password_hash},
-            {"$set": {"lastLogin": now, "updatedAt": now}}, return_document=ReturnDocument.AFTER,
+            {"$set": {"lastLogin": now, "updatedAt": now}}, return_document=ReturnDocument.AFTER, session=session,
         )
 
     async def revoke(self, user_id: str, version: int) -> bool:
@@ -41,19 +42,19 @@ class AuthRepository:
         )
         return result.modified_count == 1
 
-    async def update_landing(self, user_id: str, version: int, landing: str) -> dict[str, Any] | None:
+    async def update_landing(self, user_id: str, version: int, landing: str, session=None) -> dict[str, Any] | None:
         """Persist a preference only while the requesting session remains active."""
         return await self.users.find_one_and_update(
             {"_id": ObjectId(user_id), "status": "Active", "tokenVersion": version},
             {"$set": {"defaultLandingPage": landing, "updatedAt": datetime.now(UTC)}},
-            return_document=ReturnDocument.AFTER,
+            return_document=ReturnDocument.AFTER, session=session,
         )
 
-    async def change_password(self, user_id: str, version: int, previous_hash: str, replacement_hash: str) -> bool:
+    async def change_password(self, user_id: str, version: int, previous_hash: str, replacement_hash: str, session=None) -> bool:
         """Compare credentials/version and rotate all credential state in one write."""
         result = await self.users.update_one(
             {"_id": ObjectId(user_id), "status": "Active", "tokenVersion": version, "passwordHash": previous_hash},
             {"$set": {"passwordHash": replacement_hash, "mustChangePassword": False, "updatedAt": datetime.now(UTC)},
-             "$inc": {"tokenVersion": 1}},
+             "$inc": {"tokenVersion": 1}}, session=session,
         )
         return result.modified_count == 1

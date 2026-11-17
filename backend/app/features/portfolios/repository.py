@@ -55,20 +55,20 @@ class PortfolioRepository:
         rows = await self.applications.find(query, projection).sort([("name", 1), ("_id", 1)]).skip((page - 1) * page_size).limit(page_size).to_list(None)
         return rows, await self.applications.count_documents(query)
 
-    async def create(self, fields: dict[str, Any]) -> dict[str, Any]:
+    async def create(self, fields: dict[str, Any], session=None) -> dict[str, Any]:
         """Insert validated fields; uniqueness is enforced by the database index."""
         now = datetime.now(UTC)
         document = {**fields, "createdAt": now, "updatedAt": now}
-        result = await self.collection.insert_one(document)
-        return await self.collection.find_one({"_id": result.inserted_id})
+        result = await self.collection.insert_one(document, session=session)
+        return await self.collection.find_one({"_id": result.inserted_id}, session=session)
 
-    async def update(self, previous: dict[str, Any], scope: list[ObjectId] | None, fields: dict[str, Any]) -> dict[str, Any] | None:
+    async def update(self, previous: dict[str, Any], scope: list[ObjectId] | None, fields: dict[str, Any], session=None) -> dict[str, Any] | None:
         """Compare prior fields to avoid overwriting a concurrent edit or deletion."""
         query = self.query(scope, previous["_id"])
         query["updatedAt"] = previous["updatedAt"]
         for field in ("name", "owner", "description", "productArea", "status"):
             query[field] = previous[field]
-        return await self.collection.find_one_and_update(query, {"$set": {**fields, "updatedAt": datetime.now(UTC)}}, return_document=ReturnDocument.AFTER)
+        return await self.collection.find_one_and_update(query, {"$set": {**fields, "updatedAt": datetime.now(UTC)}}, return_document=ReturnDocument.AFTER, session=session)
 
     async def has_links(self, identifier: ObjectId) -> bool:
         """Check every linked application, including retired records."""

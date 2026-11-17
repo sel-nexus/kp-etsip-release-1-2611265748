@@ -15,6 +15,7 @@ from app.core.security import hash_password
 from app.core.seed import seed_database
 from app.features.audit.repository import AuditRepository
 from app.features.audit.service import AuditService
+from app.features.audit.router import router as audit_router
 from app.features.auth.repository import AuthRepository
 from app.features.auth.router import router
 from app.features.auth.service import AuthService
@@ -90,6 +91,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(dashboard_router)
     application.include_router(users_router)
     application.include_router(roles_router)
+    application.include_router(audit_router)
 
     @application.middleware("http")
     async def security_headers(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:

@@ -73,12 +73,12 @@ class PortfolioService:
         items = [LinkedApplication(id=value["_id"], **{key: value[key] for key in LinkedApplication.model_fields if key != "id"}) for value in rows]
         return Page(items=items, total=total, page=page, pageSize=page_size)
 
-    async def event(self, session: Session, identifier: str, action: Literal["create", "edit", "delete"]) -> None:
+    async def event(self, session: Session, identifier: str, action: Literal["create", "edit", "delete"], tx=None) -> None:
         """Append fixed credential-free summaries after successful mutations."""
         now = datetime.now(UTC)
         await self.audit.append(AuditEvent(timestamp=now, userId=session.user.id, userName=session.user.name,
             action=action, entityType="portfolio", entityId=identifier, details=f"Portfolio {action} succeeded",
-            createdAt=now, updatedAt=now))
+            createdAt=now, updatedAt=now), session=tx)
 
     async def create(self, session: Session, payload: PortfolioWrite) -> Portfolio:
         """Allow only unrestricted Administrators to create a visible new portfolio.
@@ -90,27 +90,38 @@ class PortfolioService:
         require_permission(session, "create", "portfolio")
         if portfolio_scope(session) is not None:
             raise DomainError(403, "Cannot create outside assigned portfolio scope")
+        async def work(tx):
+            """Commit the new portfolio and its event together."""
+            row = await self.repository.create(payload.model_dump(), session=tx)
+            await self.event(session, str(row["_id"]), "create", tx)
+            return row
         try:
-            row = await self.repository.create(payload.model_dump())
+            row = await transaction(self.repository.db, work)
         except DuplicateKeyError as exc:
             raise DomainError(409, "Portfolio name already exists") from exc
         result = (await self.project([row]))[0]
-        await self.event(session, result.id, "create")
+
         return result
 
     async def update(self, session: Session, identifier: str, payload: PortfolioWrite) -> Portfolio:
         """Allow Administrators or assigned Portfolio Leaders to edit visible records."""
         previous = await self.visible(session, identifier)
         require_permission(session, "edit", "portfolio")
+        async def work(tx):
+            """Compare the prior state and commit its event with the update."""
+            row = await self.repository.update(previous, portfolio_scope(session), payload.model_dump(), session=tx)
+            if row is not None:
+                await self.event(session, identifier, "edit", tx)
+            return row
         try:
-            row = await self.repository.update(previous, portfolio_scope(session), payload.model_dump())
+            row = await transaction(self.repository.db, work)
         except DuplicateKeyError as exc:
             raise DomainError(409, "Portfolio name already exists") from exc
         if row is None:
             await self.visible(session, identifier)
             raise DomainError(409, "Portfolio changed; reload before editing")
         result = (await self.project([row]))[0]
-        await self.event(session, identifier, "edit")
+
         return result
 
     async def delete(self, session: Session, identifier: str) -> None:

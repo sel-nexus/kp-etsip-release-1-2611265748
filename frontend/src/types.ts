@@ -38,6 +38,18 @@ export interface ProfileUpdate { defaultLandingPage: LandingPage }
 export interface PasswordChange { currentPassword: string; newPassword: string }
 
 export interface ListPage<T> { items: T[]; total: number; page: number; pageSize: number }
+export interface AuditRecord {
+  id: string;
+  timestamp: string;
+  userId: string | null;
+  userName: string;
+  action: 'login' | 'create' | 'edit' | 'delete' | 'roleChange' | 'permissionChange' | 'export';
+  entityType: string;
+  entityId: string | null;
+  details: string;
+  createdAt: string;
+  updatedAt: string;
+}
 export interface PortfolioWrite { name: string; owner: string; description: string; productArea: string; status: 'Active' | 'Archived' }
 export interface Portfolio extends PortfolioWrite { id: string; applicationCount: number; qualityScore: number | null; createdAt: string; updatedAt: string }
 export interface LinkedApplication { id: string; name: string; portfolioId: string; productArea: string; lifecycleStatus: 'Active' | 'Deprecated' | 'Retired'; qualityScore: number; riskLevel: 'Low' | 'Medium' | 'High' }
