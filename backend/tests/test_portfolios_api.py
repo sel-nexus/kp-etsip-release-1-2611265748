@@ -42,6 +42,7 @@ async def test_linked_apps_are_real_paginated_and_prevent_deletion(client, db):
     auth = await headers(client, 'admin@ketsip.local')
     portfolio = await db.portfolios.find_one({'name': 'Payments'})
     identifier = str(portfolio['_id'])
+    await db.applications.delete_many({'portfolioId': portfolio['_id']})
     for name, score in [('Alpha', 50), ('Beta', 51)]:
         await db.applications.insert_one({'name': name, 'portfolioId': portfolio['_id'], 'qualityScore': score,
             'productArea': 'Payments', 'lifecycleStatus': 'Active', 'riskLevel': 'Medium'})

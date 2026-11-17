@@ -49,6 +49,34 @@ async def seed_database(db: AsyncDatabase, settings: Settings) -> None:
                 }}, upsert=True)
                 portfolio = await db.portfolios.find_one({"seedKey": name})
         portfolios.append(portfolio["_id"])
+    # Stable seed keys survive renamed records; existing data is never overwritten.
+    inventory = [
+        ("Payment Gateway", 0, "Critical", 1, "Active", 82, 78, 73, 69, 12, 2, "High"),
+        ("Settlement Engine", 0, "High", 1, "Active", 88, 85, 80, 76, 8, 1, "Medium"),
+        ("Fraud Review", 0, "High", 2, "Active", 74, 72, 61, 65, 18, 3, "High"),
+        ("Billing Archive", 0, "Medium", 3, "Deprecated", 67, 70, 52, 58, 11, 0, "Medium"),
+        ("Customer Portal", 1, "Critical", 1, "Active", 91, 89, 84, 81, 5, 0, "Low"),
+        ("Identity Directory", 1, "High", 2, "Active", 85, 83, 78, 74, 9, 1, "Medium"),
+        ("Contact Preferences", 1, "Medium", 3, "Active", 92, 90, 88, 86, 3, 0, "Low"),
+        ("Analytics Warehouse", 2, "High", 2, "Active", 79, 81, 70, 72, 14, 2, "High"),
+        ("Data Catalog", 2, "Medium", 3, "Active", 87, 86, 77, 79, 6, 0, "Low"),
+        ("Legacy Extracts", 2, "Low", 4, "Retired", 58, 62, 35, 40, 7, 0, "Medium"),
+    ]
+    areas = ["Financial Services", "Customer Experience", "Data"]
+    for name, index, criticality, tier, lifecycle, health, quality, automation, unit, defects, critical, risk in inventory:
+        existing = await db.applications.find_one({"$or": [{"seedKey": name}, {"name": name}]})
+        if existing is not None:
+            continue
+        await db.applications.update_one({"seedKey": name}, {"$setOnInsert": {
+            "name": name, "description": f"Manually maintained inventory for {name}.",
+            "portfolioId": portfolios[index], "productArea": areas[index],
+            "businessOwner": "Business Operations", "technologyOwner": "Platform Engineering", "etsOwner": "Enterprise Testing Services",
+            "criticality": criticality, "tier": tier, "lifecycleStatus": lifecycle,
+            "technologyStack": "Cloud services and APIs", "repositoryLink": None, "pipelineLink": None,
+            "applicationHealthScore": health, "qualityScore": quality, "automationCoverage": automation,
+            "unitTestCoverage": unit, "openDefects": defects, "openCriticalDefects": critical,
+            "riskLevel": risk, "createdAt": now, "updatedAt": now,
+        }}, upsert=True)
     for role, permissions in ROLE_PERMISSIONS.items():
         await db.roles.update_one({"name": role}, {"$setOnInsert": {
             "name": role, "description": f"Local {role} role", "permissions": permissions,

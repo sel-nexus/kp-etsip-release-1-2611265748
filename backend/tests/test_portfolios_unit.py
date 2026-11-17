@@ -49,6 +49,7 @@ async def test_service_scope_rounding_pagination_and_validation(client, applicat
     visible = await service.listing(leader)
     assert visible.total == 1
     identifier = visible.items[0].id
+    await db.applications.delete_many({'portfolioId': ObjectId(identifier)})
     for index, score in enumerate([40, 41]):
         await db.applications.insert_one({'name': f'Application {index}', 'portfolioId': ObjectId(identifier),
             'qualityScore': score, 'productArea': 'Area', 'lifecycleStatus': 'Active', 'riskLevel': 'High'})

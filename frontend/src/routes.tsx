@@ -5,6 +5,8 @@ import LoginPage from './features/auth/LoginPage';
 import ProfilePage from './features/profile/ProfilePage';
 import PortfoliosPage from './features/portfolios/PortfoliosPage';
 import PortfolioDetailPage from './features/portfolios/PortfolioDetailPage';
+import ApplicationsPage from './features/applications/ApplicationsPage';
+import ApplicationDetailPage from './features/applications/ApplicationDetailPage';
 import { useAuth } from './features/auth/AuthProvider';
 import { Shell } from './shared/Shell';
 import { Button } from './shared/Button';
@@ -49,7 +51,7 @@ function AccountPage() {
         </dl>
       </section>
       <p className="muted">
-        Portfolio inventory is available. Application and insight pages are not yet available. Your landing preference is saved for those pages when available.
+        Portfolio and application inventory are available. Executive insights are not yet available.
       </p>
       <p><Link to="/profile">Manage profile and password</Link></p>
       <Button variant="secondary" onClick={() => void refresh()} pending={loading}>Refresh identity</Button>
@@ -72,8 +74,8 @@ function LoginRoute() {
 export function AppRoutes() {
   const location = useLocation();
   useEffect(() => {
-    const titles: Record<string, string> = { '/': 'Enterprise access', '/login': 'Sign in', '/account': 'Account & session', '/profile': 'My Profile', '/portfolios': 'Portfolios' };
-    document.title = `${titles[location.pathname] || (location.pathname.startsWith('/portfolios/') ? 'Portfolio detail' : 'Page not found')} · KP ETSIP`;
+    const titles: Record<string, string> = { '/': 'Enterprise access', '/login': 'Sign in', '/account': 'Account & session', '/profile': 'My Profile', '/portfolios': 'Portfolios', '/applications': 'Applications' };
+    document.title = `${titles[location.pathname] || (location.pathname.startsWith('/portfolios/') ? 'Portfolio detail' : location.pathname.startsWith('/applications/') ? 'Application detail' : 'Page not found')} · KP ETSIP`;
   }, [location.pathname]);
   return (
     <Routes>
@@ -84,6 +86,8 @@ export function AppRoutes() {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/portfolios" element={<PortfoliosPage />} />
         <Route path="/portfolios/:id" element={<PortfolioDetailPage />} />
+        <Route path="/applications" element={<ApplicationsPage />} />
+        <Route path="/applications/:id" element={<ApplicationDetailPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

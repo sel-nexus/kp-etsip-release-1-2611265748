@@ -74,16 +74,22 @@ describe('Local identity', () => {
   });
 
   it.each(['Administrator', 'Engineer', 'Auditor', 'Read Only', 'Portfolio Leader'] as const)(
-    'routes %s to a real account view without later page links', async (role) => {
-      vi.spyOn(globalThis, 'fetch').mockResolvedValue(json({ token: 'server-token', user: { ...identity, role, mustChangePassword: role === 'Administrator' } }));
+    'routes %s to the appropriate available landing page', async (role) => {
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+        if (String(url).includes('/auth/login')) return json({ token: 'server-token', user: { ...identity, role, mustChangePassword: role === 'Administrator' } });
+        return json({ items: [], total: 0, page: 1, pageSize: 25 });
+      });
       mount('/login');
       const user = await fillLogin();
       await user.click(screen.getByRole('button', { name: 'Sign in' }));
-      expect(await screen.findByRole('heading', { name: role === 'Administrator' ? 'My Profile' : 'Account & session' })).toBeVisible();
-      expect(screen.getByText(role, { selector: 'dd' })).toBeVisible();
-      expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument();
-      if (role === 'Administrator') expect(screen.getByText(/Password change is required/)).toBeVisible();
-      if (['Engineer', 'Read Only', 'Portfolio Leader'].includes(role)) expect(screen.getByText('No assigned portfolios')).toBeVisible();
+      expect(await screen.findByRole('heading', { name: role === 'Administrator' ? 'My Profile' : 'Applications' })).toBeVisible();
+      if (role === 'Administrator') {
+        expect(screen.getByText(role, { selector: 'dd' })).toBeVisible();
+        expect(screen.getByText(/Password change is required/)).toBeVisible();
+      } else {
+        expect(window.location.pathname).toBe('/applications');
+        expect(await screen.findByText('No visible applications.')).toBeVisible();
+      }
     },
   );
 

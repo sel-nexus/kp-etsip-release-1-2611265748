@@ -13,7 +13,8 @@ export default function LoginPage() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
-  if (auth.user) return <Navigate to={auth.user.mustChangePassword ? '/profile' : '/account'} replace />;
+  if (auth.user) return <Navigate to={auth.user.mustChangePassword ? '/profile' :
+    auth.user.defaultLandingPage === 'applications' || (!auth.user.defaultLandingPage && !['Administrator', 'Executive'].includes(auth.user.role)) ? '/applications' : '/account'} replace />;
   /** Validate local fields, avoid duplicate submission, and disclose server failure. */
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -29,7 +30,7 @@ export default function LoginPage() {
     try {
       await auth.login({ email: email.trim(), password });
       setPassword('');
-      // The live identity redirect above chooses forced profile or available account.
+      // The identity redirect chooses forced profile, available preference, or account fallback.
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Unable to sign in.');
     } finally { setPending(false); }

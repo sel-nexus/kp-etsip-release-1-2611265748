@@ -29,3 +29,22 @@ export interface ListPage<T> { items: T[]; total: number; page: number; pageSize
 export interface PortfolioWrite { name: string; owner: string; description: string; productArea: string; status: 'Active' | 'Archived' }
 export interface Portfolio extends PortfolioWrite { id: string; applicationCount: number; qualityScore: number | null; createdAt: string; updatedAt: string }
 export interface LinkedApplication { id: string; name: string; portfolioId: string; productArea: string; lifecycleStatus: 'Active' | 'Deprecated' | 'Retired'; qualityScore: number; riskLevel: 'Low' | 'Medium' | 'High' }
+export interface Application extends LinkedApplication {
+  description: string;
+  portfolioName: string;
+  businessOwner: string;
+  technologyOwner: string;
+  etsOwner: string;
+  criticality: 'Low' | 'Medium' | 'High' | 'Critical';
+  tier: number;
+  technologyStack: string;
+  repositoryLink: string | null;
+  pipelineLink: string | null;
+  applicationHealthScore: number;
+  automationCoverage: number;
+  unitTestCoverage: number;
+  openDefects: number;
+  openCriticalDefects: number;
+  createdAt: string;
+  updatedAt: string;
+}

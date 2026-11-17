@@ -98,7 +98,7 @@ export default function PortfolioDetailPage() {
               next.set('applicationsPage', String(value));
               setParams(next);
             }} columns={[
-              { title: 'Name', render: app => app.name },
+              { title: 'Name', render: app => <Link to={`/applications/${app.id}`}>{app.name}</Link> },
               { title: 'Product area', render: app => app.productArea },
               { title: 'Lifecycle', render: app => app.lifecycleStatus },
               { title: 'Quality score', render: app => app.qualityScore },
