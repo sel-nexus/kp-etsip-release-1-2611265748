@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from pymongo.asynchronous.database import AsyncDatabase
 from app.core.config import Settings
 from app.core.security import hash_password
+from app.core.transactions import transaction, touch_portfolio
 
 ROLE_PERMISSIONS = {
     "Administrator": ["view", "create", "edit", "delete", "export", "administer"],
@@ -64,10 +65,13 @@ async def seed_database(db: AsyncDatabase, settings: Settings) -> None:
     ]
     areas = ["Financial Services", "Customer Experience", "Data"]
     for name, index, criticality, tier, lifecycle, health, quality, automation, unit, defects, critical, risk in inventory:
-        existing = await db.applications.find_one({"$or": [{"seedKey": name}, {"name": name}]})
-        if existing is not None:
-            continue
-        await db.applications.update_one({"seedKey": name}, {"$setOnInsert": {
+        async def seed_application(tx):
+            """Keep a seed reference and its portfolio in one retryable transaction."""
+            existing = await db.applications.find_one({"$or": [{"seedKey": name}, {"name": name}]}, session=tx)
+            if existing is not None:
+                return
+            await touch_portfolio(db, portfolios[index], None, tx)
+            await db.applications.update_one({"seedKey": name}, {"$setOnInsert": {
             "name": name, "description": f"Manually maintained inventory for {name}.",
             "portfolioId": portfolios[index], "productArea": areas[index],
             "businessOwner": "Business Operations", "technologyOwner": "Platform Engineering", "etsOwner": "Enterprise Testing Services",
@@ -76,7 +80,8 @@ async def seed_database(db: AsyncDatabase, settings: Settings) -> None:
             "applicationHealthScore": health, "qualityScore": quality, "automationCoverage": automation,
             "unitTestCoverage": unit, "openDefects": defects, "openCriticalDefects": critical,
             "riskLevel": risk, "createdAt": now, "updatedAt": now,
-        }}, upsert=True)
+            }}, upsert=True, session=tx)
+        await transaction(db, seed_application)
     for role, permissions in ROLE_PERMISSIONS.items():
         await db.roles.update_one({"name": role}, {"$setOnInsert": {
             "name": role, "description": f"Local {role} role", "permissions": permissions,

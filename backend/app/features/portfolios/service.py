@@ -12,6 +12,7 @@ from app.features.audit.repository import AuditRepository
 from app.features.audit.schemas import AuditEvent
 from app.features.portfolios.repository import PortfolioRepository
 from app.features.portfolios.schemas import LinkedApplication, Portfolio, PortfolioWrite
+from app.core.transactions import transaction, touch_portfolio
 
 
 class PortfolioService:
@@ -113,17 +114,18 @@ class PortfolioService:
         return result
 
     async def delete(self, session: Session, identifier: str) -> None:
-        """Permit Administrator deletion only when no actual applications reference it.
-
-        Notes:
-            This slice has no application writer. Future writers must coordinate reference
-            creation and portfolio deletion; standalone Mongo cannot transact across collections.
-        """
+        """Delete only an unreferenced portfolio in a retryable transaction."""
         previous = await self.visible(session, identifier)
         require_permission(session, "delete", "portfolio")
-        if await self.repository.has_links(previous["_id"]):
-            raise DomainError(409, "Portfolio has linked applications and cannot be deleted")
-        if not await self.repository.delete(previous, portfolio_scope(session)):
-            await self.visible(session, identifier)
-            raise DomainError(409, "Portfolio changed; reload before deleting")
-        await self.event(session, identifier, "delete")
+        db = self.repository.db
+        async def work(tx):
+            """Conflict with concurrent reference writers, then verify and delete."""
+            await touch_portfolio(db, previous["_id"], portfolio_scope(session), tx)
+            if await db.applications.find_one({"portfolioId": previous["_id"]}, session=tx):
+                raise DomainError(409, "Portfolio has linked applications and cannot be deleted")
+            await db.portfolios.delete_one({"_id": previous["_id"]}, session=tx)
+            now = datetime.now(UTC)
+            await self.audit.append(AuditEvent(timestamp=now, userId=session.user.id, userName=session.user.name,
+                action="delete", entityType="portfolio", entityId=identifier, details="Portfolio delete succeeded",
+                createdAt=now, updatedAt=now), session=tx)
+        await transaction(db, work)

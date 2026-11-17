@@ -1,14 +1,20 @@
 /** Display every maintained application field without providing write actions. */
-import { useCallback } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useCallback, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { Button } from '../../shared/Button';
+import { ConfirmDialog } from '../../shared/ConfirmDialog';
 import { useResource } from '../../shared/useResource';
-import { canViewApplications, getApplication, safeWebLink } from './applicationApi';
+import { canViewApplications, canWriteApplication, deleteApplication, getApplication, safeWebLink } from './applicationApi';
 
 /** Offer safe external links and scoped portfolio navigation. */
 export default function ApplicationDetailPage() {
   const { id = '' } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [confirm, setConfirm] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
   const { user } = useAuth();
   const allowed = canViewApplications(user);
   const load = useCallback(() => getApplication(id), [id]);
@@ -25,7 +31,12 @@ export default function ApplicationDetailPage() {
       {item && (
         <>
           <h1>{item.name}</h1>
+          {(location.state as { message?: string } | null)?.message && <p role="status">{(location.state as { message: string }).message}</p>}
           <p className="muted">These quality and risk values are manually maintained.</p>
+          <div className="actions">
+            {canWriteApplication(user, 'edit') && <Link to={`/applications/${id}/edit`}>Edit application</Link>}
+            {canWriteApplication(user, 'delete') && <Button variant="secondary" onClick={() => setConfirm(true)}>Delete application</Button>}
+          </div>
           <section className="card" aria-label="Application details">
             <dl>
               <dt>Description</dt><dd>{item.description || '—'}</dd>
@@ -53,6 +64,13 @@ export default function ApplicationDetailPage() {
           </section>
         </>
       )}
+      {confirm && <ConfirmDialog title="Delete application?" message="This permanently removes the application." pending={pending} error={error}
+        onCancel={() => setConfirm(false)} onConfirm={() => {
+          setPending(true); setError('');
+          void deleteApplication(id).then(() => navigate('/applications', { state: { message: 'Application deleted.' } }))
+            .catch(failure => setError(failure instanceof Error ? failure.message : 'Unable to delete application.'))
+            .finally(() => setPending(false));
+        }} />}
     </>
   );
 }

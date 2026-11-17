@@ -1,16 +1,17 @@
 /** Present a searchable, URL-addressable application inventory. */
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { listPortfolios } from '../portfolios/portfolioApi';
 import { Button } from '../../shared/Button';
 import { DataTable } from '../../shared/DataTable';
 import { useResource } from '../../shared/useResource';
-import { canViewApplications, listApplications } from './applicationApi';
+import { canViewApplications, canWriteApplication, listApplications } from './applicationApi';
 
 /** Display user-visible results, filters, pagination, and recoverable failures. */
 export default function ApplicationsPage() {
   const { user } = useAuth();
+  const location = useLocation();
   const [params, setParams] = useSearchParams();
   const query = params.toString();
   const allowed = canViewApplications(user);
@@ -33,6 +34,8 @@ export default function ApplicationsPage() {
   return (
     <>
       <h1>Applications</h1>
+      {(location.state as { message?: string } | null)?.message && <p role="status">{(location.state as { message: string }).message}</p>}
+      {canWriteApplication(user, 'create') && <p><Link to="/applications/new">Create application</Link></p>}
       <p className="muted">Quality and risk values are manually maintained inventory, not automated evidence.</p>
       {!allowed ? <p role="alert" className="error">Access denied</p> : (
         <>

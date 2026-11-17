@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
     APP_ENV: Literal["development", "production", "test"] = "development"
-    MONGODB_URI: str = "mongodb://127.0.0.1:27017"
+    MONGODB_URI: str = "mongodb://127.0.0.1:27119/?replicaSet=rs0"
     MONGODB_DB: str = Field(default="etsip", pattern=r"^[a-zA-Z0-9_-]+$")
     JWT_SECRET: SecretStr
     JWT_EXPIRY_HOURS: int = Field(default=8, ge=1, le=24)

@@ -48,3 +48,4 @@ export interface Application extends LinkedApplication {
   createdAt: string;
   updatedAt: string;
 }
+export type ApplicationWrite = Omit<Application, 'id' | 'portfolioName' | 'createdAt' | 'updatedAt'>;

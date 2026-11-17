@@ -13,6 +13,7 @@ class PortfolioRepository:
         """Bind shared collections without opening another client."""
         self.collection = db.portfolios
         self.applications = db.applications
+        self.db = db
 
     def query(self, scope: list[ObjectId] | None, identifier: ObjectId | None = None) -> dict[str, Any]:
         """Build visibility even for an empty assignment list."""

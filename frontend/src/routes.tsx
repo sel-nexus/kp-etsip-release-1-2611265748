@@ -7,6 +7,7 @@ import PortfoliosPage from './features/portfolios/PortfoliosPage';
 import PortfolioDetailPage from './features/portfolios/PortfolioDetailPage';
 import ApplicationsPage from './features/applications/ApplicationsPage';
 import ApplicationDetailPage from './features/applications/ApplicationDetailPage';
+import ApplicationEditPage from './features/applications/ApplicationEditPage';
 import { useAuth } from './features/auth/AuthProvider';
 import { Shell } from './shared/Shell';
 import { Button } from './shared/Button';
@@ -87,6 +88,8 @@ export function AppRoutes() {
         <Route path="/portfolios" element={<PortfoliosPage />} />
         <Route path="/portfolios/:id" element={<PortfolioDetailPage />} />
         <Route path="/applications" element={<ApplicationsPage />} />
+        <Route path="/applications/new" element={<ApplicationEditPage />} />
+        <Route path="/applications/:id/edit" element={<ApplicationEditPage />} />
         <Route path="/applications/:id" element={<ApplicationDetailPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

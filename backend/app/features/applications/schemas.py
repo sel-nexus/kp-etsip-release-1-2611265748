@@ -11,13 +11,11 @@ Lifecycle = Literal["Active", "Deprecated", "Retired"]
 Text = Annotated[str, StringConstraints(max_length=2000)]
 
 
-class Application(StrictSchema):
-    """Expose maintained fields and the current linked portfolio name."""
-    id: MongoId
-    name: Annotated[str, StringConstraints(min_length=1, max_length=200)]
+class ApplicationWrite(StrictSchema):
+    """Validate every user-maintained inventory field."""
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
     description: Text
-    portfolioId: MongoId
-    portfolioName: str
+    portfolioId: Annotated[str, StringConstraints(pattern=r"^[0-9a-fA-F]{24}$")]
     productArea: Text
     businessOwner: Text
     technologyOwner: Text
@@ -35,8 +33,6 @@ class Application(StrictSchema):
     openDefects: int = Field(ge=0)
     openCriticalDefects: int = Field(ge=0)
     riskLevel: RiskLevel
-    createdAt: datetime
-    updatedAt: datetime
 
     @field_validator("repositoryLink", "pipelineLink")
     @classmethod
@@ -47,3 +43,12 @@ class Application(StrictSchema):
             if parts.scheme not in ("http", "https") or not parts.hostname or parts.username or parts.password:
                 raise ValueError("Only HTTP(S) links without credentials are allowed")
         return value
+
+
+class Application(ApplicationWrite):
+    """Expose maintained fields and the current linked portfolio name."""
+    id: MongoId
+    portfolioId: MongoId
+    portfolioName: str
+    createdAt: datetime
+    updatedAt: datetime

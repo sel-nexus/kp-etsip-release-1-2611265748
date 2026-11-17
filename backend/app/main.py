@@ -10,7 +10,7 @@ from pymongo import AsyncMongoClient
 from pydantic import BaseModel, ConfigDict
 from app.core.config import Settings
 from app.core.database import create_indexes
-from app.core.errors import register_errors
+from app.core.errors import DomainError, register_errors
 from app.core.security import hash_password
 from app.core.seed import seed_database
 from app.features.audit.repository import AuditRepository
@@ -56,7 +56,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             application.state.auth = AuthService(AuthRepository(db), AuditService(AuditRepository(db)), config, dummy_hash)
             application.state.profile = ProfileService(application.state.auth, AuditRepository(db))
             application.state.portfolios = PortfolioService(PortfolioRepository(db), AuditRepository(db))
-            application.state.applications = ApplicationService(ApplicationRepository(db))
+            application.state.applications = ApplicationService(ApplicationRepository(db), AuditRepository(db))
             yield
         finally:
             await client.close()

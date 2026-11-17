@@ -10,6 +10,7 @@ class ApplicationRepository:
     def __init__(self, db: AsyncDatabase) -> None:
         """Bind the lifespan-owned collection."""
         self.collection = db.applications
+        self.db = db
 
     def query(self, scope: list[ObjectId] | None, search: str, portfolio: ObjectId | None,
               criticality: str | None, risk: str | None, lifecycle: str | None) -> dict[str, Any]:

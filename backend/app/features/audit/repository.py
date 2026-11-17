@@ -10,11 +10,11 @@ class AuditRepository:
         """Bind to the application's shared audit collection."""
         self.collection = db.audit_logs
 
-    async def append(self, event: AuditEvent) -> str:
+    async def append(self, event: AuditEvent, session=None) -> str:
         """Persist a validated event with BSON references and return its ID."""
         document = event.model_dump()
         for field in ("userId", "entityId"):
             if document[field] is not None:
                 document[field] = ObjectId(document[field])
-        result = await self.collection.insert_one(document)
+        result = await self.collection.insert_one(document, session=session)
         return str(result.inserted_id)

@@ -16,7 +16,7 @@ PASSWORD = "TestDemoPassword123!"
 async def application() -> AsyncIterator[FastAPI]:
     """Seed a unique test database and drop only that database after each test."""
     database_name = f"etsip_test_{uuid4().hex}"
-    settings = Settings(_env_file=None, APP_ENV="test", MONGODB_URI=os.getenv("TEST_MONGODB_URI", "mongodb://127.0.0.1:27017"),
+    settings = Settings(_env_file=None, APP_ENV="test", MONGODB_URI=os.getenv("TEST_MONGODB_URI", "mongodb://127.0.0.1:27119/?replicaSet=rs0"),
                         MONGODB_DB=database_name, JWT_SECRET="test-secret-not-for-deployment", CORS_ORIGINS="http://test",
                         SEED_ADMIN_PASSWORD=PASSWORD, SEED_DEMO_PASSWORD=PASSWORD)
     app = create_app(settings)
