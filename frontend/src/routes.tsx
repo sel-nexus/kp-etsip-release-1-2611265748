@@ -1,0 +1,84 @@
+/** Define only available public pages and the live identity/session account view. */
+import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import EntryPage from './features/auth/EntryPage';
+import LoginPage from './features/auth/LoginPage';
+import { useAuth } from './features/auth/AuthProvider';
+import { Shell } from './shared/Shell';
+import { Button } from './shared/Button';
+import { useEffect } from 'react';
+
+/** Reject unauthenticated navigation and offer retry for recoverable identity reads. */
+function Protected() {
+  const { user, loading, error, refresh } = useAuth();
+  if (loading) return <main className="container" role="status">Verifying session…</main>;
+  if (error) return (
+    <main className="container">
+      <p role="alert" className="error">{error}</p>
+      <Button onClick={() => void refresh()}>Retry session</Button>
+      <Link to="/login">Sign in</Link>
+    </main>
+  );
+  return user ? <Shell /> : <Navigate to="/login" replace />;
+}
+/** Render account fields supplied by the real me endpoint, not a future-feature stub. */
+function AccountPage() {
+  const { user, refresh, loading } = useAuth();
+  if (!user) return null;
+  const scope = user.portfolioAccess.length ? user.portfolioAccess.join(', ') :
+    ['Administrator', 'Executive', 'Auditor'].includes(user.role) ? 'All portfolios' : 'No assigned portfolios';
+  return (
+    <>
+      <h1>Account &amp; session</h1>
+      <p className="muted">Your current local identity and effective access.</p>
+      {user.mustChangePassword && (
+        <p className="notice" role="status">
+          Password change is required before business access. Password management is not available in this identity slice.
+        </p>
+      )}
+      <section className="card" aria-label="Current identity">
+        <dl>
+          <dt>Name</dt><dd>{user.name}</dd>
+          <dt>Email</dt><dd>{user.email}</dd>
+          <dt>Role</dt><dd>{user.role}</dd>
+          <dt>Portfolio access</dt><dd>{scope}</dd>
+          <dt>Permissions</dt><dd>{user.permissions.join(', ') || 'None'}</dd>
+          <dt>Account status</dt><dd>{user.status}</dd>
+          <dt>Authentication</dt><dd>Local email and password</dd>
+          <dt>Last sign-in</dt><dd>{user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'No previous sign-in'}</dd>
+          <dt>Landing preference</dt><dd>{user.defaultLandingPage || 'Role default'}</dd>
+        </dl>
+      </section>
+      <p className="muted">Inventory and insight pages are not available in this slice. All roles currently land on this account view.</p>
+      <Button variant="secondary" onClick={() => void refresh()} pending={loading}>Refresh identity</Button>
+    </>
+  );
+}
+/** Display sign-out outcome supplied by native navigation state. */
+function LoginRoute() {
+  const location = useLocation();
+  const message = (location.state as { message?: string } | null)?.message;
+  return (
+    <>
+      {message && <p className="container" role="status">{message}</p>}
+      <LoginPage />
+    </>
+  );
+}
+/** Map a single router's locations to complete existing pages. */
+export function AppRoutes() {
+  const location = useLocation();
+  useEffect(() => {
+    const titles: Record<string, string> = { '/': 'Enterprise access', '/login': 'Sign in', '/account': 'Account & session' };
+    document.title = `${titles[location.pathname] || 'Page not found'} · KP ETSIP`;
+  }, [location.pathname]);
+  return (
+    <Routes>
+      <Route path="/" element={<EntryPage />} />
+      <Route path="/login" element={<LoginRoute />} />
+      <Route element={<Protected />}>
+        <Route path="/account" element={<AccountPage />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
