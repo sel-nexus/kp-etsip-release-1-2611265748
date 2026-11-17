@@ -20,6 +20,16 @@ export interface User {
 }
 export interface LoginCredentials { email: string; password: string }
 export interface LoginResponse { token: string; user: User }
+export interface UserWrite {
+  name: string;
+  email: string;
+  role: RoleName;
+  portfolioAccess: string[];
+  status: 'Active' | 'Inactive';
+  managerName: string | null;
+  vendorIndicator: boolean;
+  password?: string;
+}
 
 export type LandingPage = 'dashboard' | 'applications';
 export interface ProfileUpdate { defaultLandingPage: LandingPage }

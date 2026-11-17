@@ -6,6 +6,7 @@ from pymongo.asynchronous.database import AsyncDatabase
 async def create_indexes(db: AsyncDatabase) -> None:
     """Create unique natural keys and bounded audit-query indexes idempotently."""
     await db.users.create_index("email", unique=True)
+    await db.guards.update_one({"_id": "active-administrators"}, {"$setOnInsert": {"version": 0}}, upsert=True)
     await db.roles.create_index("name", unique=True)
     await db.portfolios.create_index("name", unique=True)
     await db.portfolios.create_index("seedKey", unique=True, sparse=True)

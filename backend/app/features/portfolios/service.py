@@ -123,6 +123,8 @@ class PortfolioService:
             await touch_portfolio(db, previous["_id"], portfolio_scope(session), tx)
             if await db.applications.find_one({"portfolioId": previous["_id"]}, session=tx):
                 raise DomainError(409, "Portfolio has linked applications and cannot be deleted")
+            if await db.users.find_one({"portfolioAccess": previous["_id"]}, session=tx):
+                raise DomainError(409, "Portfolio has assigned users and cannot be deleted")
             await db.portfolios.delete_one({"_id": previous["_id"]}, session=tx)
             now = datetime.now(UTC)
             await self.audit.append(AuditEvent(timestamp=now, userId=session.user.id, userName=session.user.name,

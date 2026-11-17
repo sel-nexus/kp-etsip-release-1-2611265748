@@ -29,6 +29,9 @@ from app.features.applications.service import ApplicationService
 from app.features.dashboard.router import router as dashboard_router
 from app.features.dashboard.repository import DashboardRepository
 from app.features.dashboard.service import DashboardService
+from app.features.users.router import router as users_router
+from app.features.users.repository import UserRepository
+from app.features.users.service import UserService
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +64,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             application.state.portfolios = PortfolioService(PortfolioRepository(db), AuditRepository(db))
             application.state.applications = ApplicationService(ApplicationRepository(db), AuditRepository(db))
             application.state.dashboard = DashboardService(DashboardRepository(db))
+            application.state.users = UserService(UserRepository(db), AuditRepository(db), application.state.auth)
             yield
         finally:
             await client.close()
@@ -80,6 +84,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(portfolios_router)
     application.include_router(applications_router)
     application.include_router(dashboard_router)
+    application.include_router(users_router)
 
     @application.middleware("http")
     async def security_headers(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:

@@ -39,6 +39,7 @@ export function Shell() {
             {!user?.mustChangePassword && user?.permissions.includes('view') && <NavLink to="/dashboard">Executive dashboard</NavLink>}
             {!user?.mustChangePassword && user?.permissions.includes('view') && <NavLink to="/portfolios">Portfolios</NavLink>}
             {!user?.mustChangePassword && user?.permissions.includes('view') && <NavLink to="/applications">Applications</NavLink>}
+            {!user?.mustChangePassword && user?.role === 'Administrator' && user.permissions.includes('administer') && <NavLink to="/administration">Administration</NavLink>}
             <NavLink to="/profile">My Profile</NavLink>
           </nav>
         </aside>

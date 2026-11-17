@@ -114,8 +114,8 @@ async def test_admin_me_available_but_portfolios_require_password_change(client)
     assert (await client.get("/api/portfolios", headers=headers)).status_code == 403
     assert (await client.get("/api/applications", headers=headers)).status_code == 403
     assert (await client.get("/api/dashboard/executive", headers=headers)).status_code == 403
-    for path in ("/api/users", "/api/audit-logs"):
-        assert (await client.get(path, headers=headers)).status_code == 404
+    assert (await client.get("/api/users", headers=headers)).status_code == 403
+    assert (await client.get("/api/audit-logs", headers=headers)).status_code == 404
     assert (await client.post("/api/auth/change-password", headers=headers, json={})).status_code == 422
     assert (await client.post("/api/auth/logout", headers=headers)).status_code == 204
 
