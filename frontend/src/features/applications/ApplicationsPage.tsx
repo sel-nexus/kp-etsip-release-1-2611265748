@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { listPortfolios } from '../portfolios/portfolioApi';
+import { canReport, downloadReport } from '../reports/reportApi';
 import { Button } from '../../shared/Button';
 import { DataTable } from '../../shared/DataTable';
 import { useResource } from '../../shared/useResource';
@@ -15,6 +16,8 @@ export default function ApplicationsPage() {
   const [params, setParams] = useSearchParams();
   const query = params.toString();
   const allowed = canViewApplications(user);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
   const [search, setSearch] = useState(params.get('search') || '');
   const [portfolio, setPortfolio] = useState(params.get('portfolioId') || '');
   const [criticality, setCriticality] = useState(params.get('criticality') || '');
@@ -85,6 +88,14 @@ export default function ApplicationsPage() {
             <Button type="submit" variant="secondary">Apply filters</Button>
             <Button type="button" variant="secondary" onClick={() => setParams({})}>Clear filters</Button>
           </form>
+          {canReport(user, true) && <Button pending={exporting} onClick={async () => {
+            setExporting(true);
+            setExportError('');
+            try { await downloadReport('applications', query); }
+            catch (failure) { setExportError(failure instanceof Error ? failure.message : 'Unable to export applications.'); }
+            finally { setExporting(false); }
+          }}>{exporting ? 'Exporting…' : 'Export CSV'}</Button>}
+          {exportError && <p role="alert" className="error">{exportError}</p>}
           {resource.loading && <p role="status">Loading applications…</p>}
           {resource.error && <div><p role="alert" className="error">{resource.error}</p><Button variant="secondary" onClick={resource.retry}>Retry applications</Button></div>}
           {resource.data && <DataTable caption="Application inventory" data={resource.data}
