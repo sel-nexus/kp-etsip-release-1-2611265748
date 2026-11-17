@@ -79,7 +79,7 @@ describe('Local identity', () => {
       mount('/login');
       const user = await fillLogin();
       await user.click(screen.getByRole('button', { name: 'Sign in' }));
-      expect(await screen.findByRole('heading', { name: 'Account & session' })).toBeVisible();
+      expect(await screen.findByRole('heading', { name: role === 'Administrator' ? 'My Profile' : 'Account & session' })).toBeVisible();
       expect(screen.getByText(role, { selector: 'dd' })).toBeVisible();
       expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument();
       if (role === 'Administrator') expect(screen.getByText(/Password change is required/)).toBeVisible();

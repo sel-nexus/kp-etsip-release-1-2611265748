@@ -35,7 +35,8 @@ export function Shell() {
             {expanded ? 'Hide navigation' : 'Show navigation'}
           </Button>
           <nav id="account-nav" className="shell-nav" aria-label="Account" hidden={!expanded}>
-            <NavLink to="/account">Account &amp; session</NavLink>
+            {!user?.mustChangePassword && <NavLink to="/account">Account &amp; session</NavLink>}
+            <NavLink to="/profile">My Profile</NavLink>
           </nav>
         </aside>
         <main id="main"><Outlet /></main>

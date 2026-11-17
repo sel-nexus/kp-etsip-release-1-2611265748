@@ -18,6 +18,8 @@ from app.features.audit.service import AuditService
 from app.features.auth.repository import AuthRepository
 from app.features.auth.router import router
 from app.features.auth.service import AuthService
+from app.features.profile.router import router as profile_router
+from app.features.profile.service import ProfileService
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +48,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await seed_database(db, config)
             dummy_hash = await hash_password(secrets.token_urlsafe(24))
             application.state.auth = AuthService(AuthRepository(db), AuditService(AuditRepository(db)), config, dummy_hash)
+            application.state.profile = ProfileService(application.state.auth, AuditRepository(db))
             yield
         finally:
             await client.close()
@@ -58,9 +61,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     if settings is None:
         from dotenv import dotenv_values
         origins = [item.strip() for item in os.getenv("CORS_ORIGINS", dotenv_values(".env").get("CORS_ORIGINS") or "").split(",") if item.strip()]
-    application.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type"])
+    application.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET", "POST", "PUT"], allow_headers=["Authorization", "Content-Type"])
     register_errors(application)
     application.include_router(router)
+    application.include_router(profile_router)
 
     @application.middleware("http")
     async def security_headers(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:

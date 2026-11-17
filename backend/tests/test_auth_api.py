@@ -113,7 +113,7 @@ async def test_admin_me_available_but_no_future_profile_or_business_routes(clien
     assert (await client.get("/api/auth/me", headers=headers)).status_code == 200
     for path in ("/api/applications", "/api/portfolios", "/api/users", "/api/audit-logs", "/api/dashboard/executive"):
         assert (await client.get(path, headers=headers)).status_code == 404
-    assert (await client.post("/api/auth/change-password", headers=headers, json={})).status_code == 404
+    assert (await client.post("/api/auth/change-password", headers=headers, json={})).status_code == 422
     assert (await client.post("/api/auth/logout", headers=headers)).status_code == 204
 
 

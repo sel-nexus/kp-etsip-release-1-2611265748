@@ -20,3 +20,7 @@ export interface User {
 }
 export interface LoginCredentials { email: string; password: string }
 export interface LoginResponse { token: string; user: User }
+
+export type LandingPage = 'dashboard' | 'applications';
+export interface ProfileUpdate { defaultLandingPage: LandingPage }
+export interface PasswordChange { currentPassword: string; newPassword: string }

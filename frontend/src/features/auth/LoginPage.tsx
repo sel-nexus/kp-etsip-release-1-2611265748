@@ -1,20 +1,19 @@
 /** Render a semantic local credential form with clear pending/error states. */
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { Button } from '../../shared/Button';
 import { FormField } from '../../shared/FormField';
 import { useAuth } from './AuthProvider';
 /** Establish a real local session and route to its currently available account view. */
 export default function LoginPage() {
   const auth = useAuth();
-  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
-  if (auth.user) return <Navigate to="/account" replace />;
+  if (auth.user) return <Navigate to={auth.user.mustChangePassword ? '/profile' : '/account'} replace />;
   /** Validate local fields, avoid duplicate submission, and disclose server failure. */
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -30,7 +29,7 @@ export default function LoginPage() {
     try {
       await auth.login({ email: email.trim(), password });
       setPassword('');
-      navigate('/account', { replace: true });
+      // The live identity redirect above chooses forced profile or available account.
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Unable to sign in.');
     } finally { setPending(false); }

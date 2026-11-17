@@ -8,9 +8,12 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   error: string | null;
+  sessionMessage: string | null;
   login: (credentials: LoginCredentials) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  clearSession: (message?: string) => void;
+  updateIdentity: (identity: User) => void;
 }
 const AuthContext = createContext<AuthContextValue | null>(null);
 /** Own the single session state and handle expiry/cross-tab changes. */
@@ -18,6 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(Boolean(localStorage.getItem(TOKEN_KEY)));
   const [error, setError] = useState<string | null>(null);
+  const [sessionMessage, setSessionMessage] = useState<string | null>(null);
   const generation = useRef(0);
   /** Discard stale async identity results when a session is cleared. */
   const clear = useCallback(() => {
@@ -26,7 +30,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setLoading(false);
     setError(null);
+    setSessionMessage(null);
   }, []);
+  /** Retain nonsecret feedback across the protected route's sign-in redirect. */
+  const clearSession = (message?: string) => {
+    clear();
+    setSessionMessage(message || null);
+  };
   /** Revalidate the stored bearer and retain recoverable network failures. */
   const refresh = useCallback(async () => {
     const current = ++generation.current;
@@ -64,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     generation.current += 1;
     localStorage.setItem(TOKEN_KEY, result.token);
     setUser(result.user);
+    setSessionMessage(null);
     setError(null);
     setLoading(false);
   };
@@ -71,8 +82,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try { await authApi.logout(); } finally { clear(); }
   };
+  /** Apply a persisted profile response only to the still-current account. */
+  const updateIdentity = (identity: User) => {
+    if (user?.id === identity.id && localStorage.getItem(TOKEN_KEY)) {
+      generation.current += 1;
+      setUser(identity);
+    }
+  };
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, logout, refresh }}>
+    <AuthContext.Provider value={{ user, loading, error, sessionMessage, login, logout, refresh, clearSession, updateIdentity }}>
       {children}
     </AuthContext.Provider>
   );

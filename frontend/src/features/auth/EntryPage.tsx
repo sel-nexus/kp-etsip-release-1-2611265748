@@ -9,7 +9,7 @@ export default function EntryPage() {
       <p className="muted">KP ETSIP · Release 1</p>
       <h1>Enterprise quality inventory &amp; insight</h1>
       <p>Internal account access for your enterprise inventory and quality information.</p>
-      <Link className="button button-primary" to={user ? '/account' : '/login'}>
+      <Link className="button button-primary" to={user ? (user.mustChangePassword ? '/profile' : '/account') : '/login'}>
         {user ? 'View account' : 'Sign in'}
       </Link>
     </main>

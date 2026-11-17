@@ -40,3 +40,20 @@ class AuthRepository:
             {"$inc": {"tokenVersion": 1}, "$set": {"updatedAt": datetime.now(UTC)}},
         )
         return result.modified_count == 1
+
+    async def update_landing(self, user_id: str, version: int, landing: str) -> dict[str, Any] | None:
+        """Persist a preference only while the requesting session remains active."""
+        return await self.users.find_one_and_update(
+            {"_id": ObjectId(user_id), "status": "Active", "tokenVersion": version},
+            {"$set": {"defaultLandingPage": landing, "updatedAt": datetime.now(UTC)}},
+            return_document=ReturnDocument.AFTER,
+        )
+
+    async def change_password(self, user_id: str, version: int, previous_hash: str, replacement_hash: str) -> bool:
+        """Compare credentials/version and rotate all credential state in one write."""
+        result = await self.users.update_one(
+            {"_id": ObjectId(user_id), "status": "Active", "tokenVersion": version, "passwordHash": previous_hash},
+            {"$set": {"passwordHash": replacement_hash, "mustChangePassword": False, "updatedAt": datetime.now(UTC)},
+             "$inc": {"tokenVersion": 1}},
+        )
+        return result.modified_count == 1
