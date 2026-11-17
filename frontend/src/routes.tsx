@@ -3,6 +3,7 @@ import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import EntryPage from './features/auth/EntryPage';
 import LoginPage from './features/auth/LoginPage';
 import ProfilePage from './features/profile/ProfilePage';
+import DashboardPage from './features/dashboard/DashboardPage';
 import PortfoliosPage from './features/portfolios/PortfoliosPage';
 import PortfolioDetailPage from './features/portfolios/PortfolioDetailPage';
 import ApplicationsPage from './features/applications/ApplicationsPage';
@@ -52,7 +53,7 @@ function AccountPage() {
         </dl>
       </section>
       <p className="muted">
-        Portfolio and application inventory are available. Executive insights are not yet available.
+        Portfolio and application inventory and executive insights are available with view access.
       </p>
       <p><Link to="/profile">Manage profile and password</Link></p>
       <Button variant="secondary" onClick={() => void refresh()} pending={loading}>Refresh identity</Button>
@@ -75,7 +76,7 @@ function LoginRoute() {
 export function AppRoutes() {
   const location = useLocation();
   useEffect(() => {
-    const titles: Record<string, string> = { '/': 'Enterprise access', '/login': 'Sign in', '/account': 'Account & session', '/profile': 'My Profile', '/portfolios': 'Portfolios', '/applications': 'Applications' };
+    const titles: Record<string, string> = { '/': 'Enterprise access', '/login': 'Sign in', '/account': 'Account & session', '/profile': 'My Profile', '/dashboard': 'Executive dashboard', '/portfolios': 'Portfolios', '/applications': 'Applications' };
     document.title = `${titles[location.pathname] || (location.pathname.startsWith('/portfolios/') ? 'Portfolio detail' : location.pathname.startsWith('/applications/') ? 'Application detail' : 'Page not found')} · KP ETSIP`;
   }, [location.pathname]);
   return (
@@ -85,6 +86,7 @@ export function AppRoutes() {
       <Route element={<Protected />}>
         <Route path="/account" element={<AccountPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/portfolios" element={<PortfoliosPage />} />
         <Route path="/portfolios/:id" element={<PortfolioDetailPage />} />
         <Route path="/applications" element={<ApplicationsPage />} />

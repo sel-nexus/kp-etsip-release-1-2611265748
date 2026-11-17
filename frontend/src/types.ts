@@ -49,3 +49,15 @@ export interface Application extends LinkedApplication {
   updatedAt: string;
 }
 export type ApplicationWrite = Omit<Application, 'id' | 'portfolioName' | 'createdAt' | 'updatedAt'>;
+
+export interface PortfolioMetric { id: string; name: string; applicationCount: number; qualityScore: number | null; highRiskCount: number }
+export interface ExecutiveDashboard {
+  enterpriseQualityScore: number | null;
+  applicationHealthScore: number | null;
+  automationMaturityScore: number | null;
+  openCriticalDefects: number;
+  applicationsAtRisk: number;
+  totalApplications: number;
+  totalPortfolios: number;
+  portfolios: PortfolioMetric[];
+}

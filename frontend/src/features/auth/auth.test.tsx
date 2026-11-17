@@ -55,20 +55,23 @@ describe('Local identity', () => {
     expect(localStorage.getItem(TOKEN_KEY)).toBeNull();
   });
 
-  it('shows pending submission and routes actual server identity to account', async () => {
+  it('shows pending submission and routes the Executive identity to the dashboard', async () => {
     let resolve!: (response: Response) => void;
-    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise<Response>((done) => { resolve = done; }));
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      if (String(url).includes('/auth/login')) return new Promise<Response>((done) => { resolve = done; });
+      return Promise.resolve(json({ enterpriseQualityScore: 82, applicationHealthScore: 80, automationMaturityScore: 70, openCriticalDefects: 2, applicationsAtRisk: 1, totalApplications: 1, totalPortfolios: 1, portfolios: [] }));
+    });
     mount('/login');
     const user = await fillLogin();
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(screen.getByRole('button', { name: 'Signing in…' })).toBeDisabled();
     expect(screen.getByRole('status')).toHaveTextContent('Verifying your credentials');
     resolve(json({ token: 'server-issued-token', user: identity }));
-    expect(await screen.findByRole('heading', { name: 'Account & session' })).toBeVisible();
-    expect(screen.getByText('Live Executive', { selector: 'dd' })).toBeVisible();
-    expect(screen.getByText(identity.email)).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Executive dashboard' })).toBeVisible();
+    expect(screen.getByText('Live Executive')).toBeVisible();
+    expect(await screen.findByText('Enterprise Quality Score')).toBeVisible();
     expect(localStorage.getItem(TOKEN_KEY)).toBe('server-issued-token');
-    expect(window.location.pathname).toBe('/account');
+    expect(window.location.pathname).toBe('/dashboard');
     const init = fetch.mock.calls[0][1];
     expect(JSON.parse(init?.body as string)).toEqual({ email: identity.email, password: 'ConfiguredPassword123!' });
   });

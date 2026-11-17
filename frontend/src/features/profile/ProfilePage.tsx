@@ -96,7 +96,7 @@ export default function ProfilePage() {
       </section>
       <section className="mt-8" aria-labelledby="preference-heading">
         <h2 id="preference-heading">Landing preference</h2>
-        <p className="muted">Choose where to start after sign-in. Until those pages are available, you will use Account &amp; session.</p>
+        <p className="muted">Choose where to start after sign-in. Your selection requires view access.</p>
         <form onSubmit={save} noValidate aria-busy={saving}>
           <fieldset className="card" disabled={saving || changing}>
             <legend>Default landing page</legend>

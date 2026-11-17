@@ -36,6 +36,7 @@ export function Shell() {
           </Button>
           <nav id="account-nav" className="shell-nav" aria-label="Account" hidden={!expanded}>
             {!user?.mustChangePassword && <NavLink to="/account">Account &amp; session</NavLink>}
+            {!user?.mustChangePassword && user?.permissions.includes('view') && <NavLink to="/dashboard">Executive dashboard</NavLink>}
             {!user?.mustChangePassword && user?.permissions.includes('view') && <NavLink to="/portfolios">Portfolios</NavLink>}
             {!user?.mustChangePassword && user?.permissions.includes('view') && <NavLink to="/applications">Applications</NavLink>}
             <NavLink to="/profile">My Profile</NavLink>
