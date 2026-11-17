@@ -105,13 +105,14 @@ async def test_me_reads_changed_role_permissions_and_bson_scope(client, db):
     assert response.json()["portfolioAccess"] == [str(portfolio_id)]
 
 
-async def test_admin_me_available_but_no_future_profile_or_business_routes(client):
-    """Expose required first-login state without implementing later endpoints."""
+async def test_admin_me_available_but_portfolios_require_password_change(client):
+    """Expose required first-login state and enforce the business guard."""
     result = await client.post("/api/auth/login", json={"email": "admin@ketsip.local", "password": PASSWORD})
     assert result.status_code == 200 and result.json()["user"]["mustChangePassword"] is True
     headers = {"Authorization": f"Bearer {result.json()['token']}"}
     assert (await client.get("/api/auth/me", headers=headers)).status_code == 200
-    for path in ("/api/applications", "/api/portfolios", "/api/users", "/api/audit-logs", "/api/dashboard/executive"):
+    assert (await client.get("/api/portfolios", headers=headers)).status_code == 403
+    for path in ("/api/applications", "/api/users", "/api/audit-logs", "/api/dashboard/executive"):
         assert (await client.get(path, headers=headers)).status_code == 404
     assert (await client.post("/api/auth/change-password", headers=headers, json={})).status_code == 422
     assert (await client.post("/api/auth/logout", headers=headers)).status_code == 204

@@ -143,7 +143,7 @@ async def test_scope_empty_semantics_and_immutable_role_boundaries(application, 
     email = ACCOUNTS[role][0]
     result = await application.state.auth.login(LoginRequest(email=email, password=PASSWORD))
     session = await application.state.auth.authenticate(result.token)
-    session = replace(session, user=session.user.model_copy(update={"mustChangePassword": False, "permissions": list(ROLE_PERMISSIONS["Administrator"])}))
+    session = replace(session, user=session.user.model_copy(update={"mustChangePassword": False, "permissions": list(ROLE_PERMISSIONS["Administrator"]), "portfolioAccess": []}))
     assert portfolio_scope(session) == (None if role in ("Administrator", "Executive", "Auditor") else [])
     assert await get_business_session(session) == session
     for permission, resource, allowed in [
@@ -174,7 +174,7 @@ async def test_seed_is_insert_only_with_six_roles_and_users(application, db):
     assert after["name"] == "Edited" and after["passwordHash"] == before["passwordHash"]
     assert after["tokenVersion"] == 4 and not after["mustChangePassword"]
     assert (await db.roles.find_one({"name": "Executive"}))["permissions"] == []
-    assert await db.portfolios.count_documents({}) == 0
+    assert await db.portfolios.count_documents({}) == 3
 
 
 async def test_password_helpers_reject_truncation_wrong_and_corrupt_hashes():

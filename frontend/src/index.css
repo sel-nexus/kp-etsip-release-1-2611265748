@@ -114,3 +114,21 @@ dd { margin: 0; font-variant-numeric: tabular-nums; }
   .header { flex-wrap: wrap; padding: 16px; gap: 16px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; } }
+
+/* Portfolio inventory uses the existing Vital Integrity tokens. */
+select, textarea { width: 100%; min-height: 44px; padding: 12px; border: 1px solid var(--outline); border-radius: var(--radius-input); background: var(--background-white); color: var(--on-surface); font: inherit; }
+textarea { min-height: 120px; resize: vertical; }
+select:focus, textarea:focus { border-color: var(--living-green); }
+textarea[aria-invalid=true] { border-color: var(--error); }
+fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+legend { color: var(--deep-forest-teal); font-weight: 600; font-size: 24px; line-height: 32px; }
+.actions { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: 24px 0; }
+.filters { display: flex; flex-wrap: wrap; gap: 16px; align-items: end; margin-bottom: 24px; }
+.filters .field { flex: 1 1 180px; margin: 0; }
+.table-scroll { overflow-x: auto; max-width: 100%; margin-top: 24px; }
+table { border-collapse: collapse; width: 100%; min-width: 600px; background: var(--surface-container-lowest); font-variant-numeric: tabular-nums; }
+caption { text-align: left; color: var(--deep-forest-teal); padding: 16px 0; font-weight: 600; }
+th, td { text-align: left; padding: 16px; border-bottom: 1px solid var(--card-border-gray); overflow-wrap: anywhere; }
+th { color: var(--on-surface-variant); font-size: 14px; font-weight: 600; }
+.confirm-dialog { max-width: min(560px, calc(100vw - 32px)); color: var(--on-surface); }
+.confirm-dialog::backdrop { background: rgb(0 0 0 / 10%); }

@@ -24,3 +24,8 @@ export interface LoginResponse { token: string; user: User }
 export type LandingPage = 'dashboard' | 'applications';
 export interface ProfileUpdate { defaultLandingPage: LandingPage }
 export interface PasswordChange { currentPassword: string; newPassword: string }
+
+export interface ListPage<T> { items: T[]; total: number; page: number; pageSize: number }
+export interface PortfolioWrite { name: string; owner: string; description: string; productArea: string; status: 'Active' | 'Archived' }
+export interface Portfolio extends PortfolioWrite { id: string; applicationCount: number; qualityScore: number | null; createdAt: string; updatedAt: string }
+export interface LinkedApplication { id: string; name: string; portfolioId: string; productArea: string; lifecycleStatus: 'Active' | 'Deprecated' | 'Retired'; qualityScore: number; riskLevel: 'Low' | 'Medium' | 'High' }
