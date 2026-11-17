@@ -10,6 +10,7 @@ import ApplicationsPage from './features/applications/ApplicationsPage';
 import ApplicationDetailPage from './features/applications/ApplicationDetailPage';
 import ApplicationEditPage from './features/applications/ApplicationEditPage';
 import UsersPage from './features/users/UsersPage';
+import RolesPage from './features/roles/RolesPage';
 import { useAuth } from './features/auth/AuthProvider';
 import { Shell } from './shared/Shell';
 import { Button } from './shared/Button';
@@ -78,7 +79,7 @@ export function AppRoutes() {
   const location = useLocation();
   useEffect(() => {
     const titles: Record<string, string> = { '/': 'Enterprise access', '/login': 'Sign in', '/account': 'Account & session', '/profile': 'My Profile', '/dashboard': 'Executive dashboard', '/portfolios': 'Portfolios', '/applications': 'Applications', '/administration': 'Administration' };
-    document.title = `${titles[location.pathname] || (location.pathname.startsWith('/portfolios/') ? 'Portfolio detail' : location.pathname.startsWith('/applications/') ? 'Application detail' : 'Page not found')} · KP ETSIP`;
+    document.title = `${titles[location.pathname] || (location.pathname === '/administration/roles' ? 'Administration' : location.pathname.startsWith('/portfolios/') ? 'Portfolio detail' : location.pathname.startsWith('/applications/') ? 'Application detail' : 'Page not found')} · KP ETSIP`;
   }, [location.pathname]);
   return (
     <Routes>
@@ -89,6 +90,7 @@ export function AppRoutes() {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/administration" element={<UsersPage />} />
+        <Route path="/administration/roles" element={<RolesPage />} />
         <Route path="/portfolios" element={<PortfoliosPage />} />
         <Route path="/portfolios/:id" element={<PortfolioDetailPage />} />
         <Route path="/applications" element={<ApplicationsPage />} />

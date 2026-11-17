@@ -1,6 +1,8 @@
 /** Define the safe identity contract shared by account and login views. */
 export type RoleName = 'Administrator' | 'Executive' | 'Portfolio Leader' | 'Engineer' | 'Auditor' | 'Read Only';
 export type Permission = 'view' | 'create' | 'edit' | 'delete' | 'export' | 'administer';
+export interface Role { id: string; name: RoleName; description: string; permissions: Permission[]; createdAt: string; updatedAt: string }
+export interface RoleWrite { description: string; permissions: Permission[] }
 export interface User {
   id: string;
   name: string;

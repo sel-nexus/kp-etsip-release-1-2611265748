@@ -1,6 +1,6 @@
 /** Present the currently available Administration users tab. */
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import type { Portfolio, User } from '../../types';
 import { useAuth } from '../auth/AuthProvider';
 import { listPortfolios } from '../portfolios/portfolioApi';
@@ -57,7 +57,10 @@ export default function UsersPage() {
   return (
     <>
       <h1>Administration</h1>
-      <nav aria-label="Administration sections"><span aria-current="page">Users</span></nav>
+      <nav aria-label="Administration sections">
+        <span aria-current="page">Users</span>{' · '}
+        <Link to="/administration/roles">Roles</Link>
+      </nav>
       {!allowed ? <p role="alert" className="error">Access denied</p> : (
         <>
           <h2>Users</h2>
